@@ -1,0 +1,25 @@
+alias: bob
+secretKey: 0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9
+walletPath: /tmp/alice_wallet
+
+channel:
+  timeout: 30s
+  fundtimeout: 30s
+  settleTimeout: 30s
+  challengeDurationSec: 60
+
+node:
+  ip: 0.0.0.0
+  port: 1337
+  dialTimeout: 30s
+  handleTimeout: 30s
+
+chain:
+  url: ws://10.0.1.107:8545
+  adjudicator: deploy
+  assetHolder: deploy
+  deployTimeout: 30s
+
+log:
+  level: warn
+  file: "bob.log"

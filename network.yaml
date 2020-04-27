@@ -1,0 +1,10 @@
+peers:
+  alice:
+    perunID: 0xA298Fc05bccff341f340a11FffA30567a00e651f
+    hostname: 127.0.0.1
+    port: 1338
+
+  bob:
+    perunID: 0x05e71027e7d3bd6261de7634cf50F0e2142067C4
+    hostname: 127.0.0.1
+    port: 1337

@@ -1,0 +1,25 @@
+alias: alice
+secretKey: 0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a
+walletPath: /tmp/alice_wallet
+
+channel:
+  timeout: 30s
+  fundTimeout: 30s
+  settleTimeout: 30s
+  challengeDurationSec: 60
+
+node:
+  ip: 0.0.0.0
+  port: 1338
+  dialTimeout: 30s
+  handleTimeout: 30s
+
+chain:
+  url: ws://10.0.1.107:8545
+  adjudicator: 0xDc4A7e107aD6dBDA1870df34d70B51796BBd1335
+  assetholder: 0xb051EAD0C6CC2f568166F8fEC4f07511B88678bA
+  deployTimeout: 30s
+
+log:
+  level: warn
+  file: "alice.log"
