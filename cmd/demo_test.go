@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file.
 
 // +build on_chain_eth_test
+
 package cmd_test
 
 import (

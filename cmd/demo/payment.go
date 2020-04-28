@@ -24,6 +24,8 @@ type (
 		handler chan bool
 		res     chan handlerRes
 		onFinal func()
+		// save the last state to circumvent the `channel.StateMtxd` problem
+		lastState *channel.State
 	}
 
 	// A handlerRes encapsulates the result of a channel handling request
@@ -35,11 +37,12 @@ type (
 
 func newPaymentChannel(ch *client.Channel, onFinal func()) *paymentChannel {
 	return &paymentChannel{
-		Channel: ch,
-		log:     log.WithField("channel", ch.ID()),
-		handler: make(chan bool, 1),
-		res:     make(chan handlerRes),
-		onFinal: onFinal,
+		Channel:   ch,
+		log:       log.WithField("channel", ch.ID()),
+		handler:   make(chan bool, 1),
+		res:       make(chan handlerRes),
+		onFinal:   onFinal,
+		lastState: ch.State(),
 	}
 }
 func (ch *paymentChannel) sendMoney(amount *big.Int) error {
@@ -91,7 +94,7 @@ func stateBals(state *channel.State) []channel.Bal {
 }
 
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
-	oldBal := stateBals(ch.StateMtxd())
+	oldBal := stateBals(ch.lastState)
 	balChanged := oldBal[0].Cmp(update.State.Balances[0][0]) != 0
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
 	defer cancel()
@@ -106,6 +109,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 		ch.log.Trace("Calling onFinal handler for paymentChannel")
 		go ch.onFinal()
 	}
+	ch.lastState = update.State.Clone()
 }
 
 func (ch *paymentChannel) ListenUpdates() {

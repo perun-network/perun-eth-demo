@@ -3,7 +3,7 @@
 // perun-eth-demo. Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-package demo // import "perun.network/go-perun/perun/cmd/demo"
+package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 import (
 	"log"
