@@ -1,0 +1,73 @@
+name: Testing
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  Test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up Go 1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Get dependencies
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+
+    # Github does not allow the use of ! as negation. We also neet to add
+    # the *.go because otherwise the main.go is not formatted.
+    - name: fmt
+      run: |
+        if [ $(gofmt -l -s `ls -d */ *.go` | grep .) ]; then
+          false
+        else
+          true
+        fi
+
+    # Disable -set_exit_status ./... because github has no "allowed_to_fail"
+    - name: lint
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin
+        go get -u golang.org/x/lint/golint
+        golint ./...
+
+    - name: vet
+      run: go vet ./...
+
+    - name: copyright_notice
+      run: ./scripts/check-copyright-notice.sh
+
+    # Also add the *.go here
+    - name: spelling
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin
+        go get -u github.com/client9/misspell/cmd/misspell
+        ls -d */ *.go | xargs misspell -error
+    
+    - name: cyclomatic
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin
+        go get github.com/fzipp/gocyclo
+        find -name '*.go' -not -name '*_test.go' -exec gocyclo -over 15 {} +
+
+    - name: Unit Test
+      run: go test -timeout 120s -cover ./...
+
+    - name: Race Test
+      run: go test -timeout 120s -race -gcflags=all=-d=checkptr=0 ./...
