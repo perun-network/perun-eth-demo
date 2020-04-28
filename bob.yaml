@@ -15,7 +15,7 @@ node:
   handleTimeout: 30s
 
 chain:
-  url: ws://10.0.1.107:8545
+  url: ws://127.0.0.1:8545
   adjudicator: deploy
   assetHolder: deploy
   deployTimeout: 30s
