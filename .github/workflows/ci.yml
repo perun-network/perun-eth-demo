@@ -11,6 +11,11 @@ jobs:
   Test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      ganache:
+        image: trufflesuite/ganache-cli
+        ports:
+          - 8545:8545
     steps:
 
     - name: Set up Go 1.14
