@@ -51,7 +51,7 @@ func initConfig() {
 }
 
 func runRoot(c *cobra.Command, args []string) {
-	SetConfig()
+	setConfig()
 }
 
 // Execute called by rootCmd

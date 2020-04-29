@@ -13,6 +13,7 @@ import (
 	perun "perun.network/go-perun/peer"
 )
 
+// Config contains all configuration read from config.yaml and network.yaml
 type Config struct {
 	Alias      string
 	SecretKey  string
