@@ -72,7 +72,7 @@ jobs:
         find -name '*.go' -not -name '*_test.go' -exec gocyclo -over 15 {} +
 
     - name: Unit Test
-      run: go test -timeout 120s -cover ./...
+      run: go test -timeout 120s -v -cover ./... || cat cmd/alice.log cmd/bob.log
 
     - name: Race Test
       run: go test -timeout 120s -race -gcflags=all=-d=checkptr=0 ./...
