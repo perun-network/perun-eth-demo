@@ -3,8 +3,6 @@
 // perun-eth-demo. Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-// +build on_chain_eth_test
-
 package cmd_test
 
 import (
@@ -21,7 +19,7 @@ import (
 
 var (
 	any     = regexp.MustCompile(".+")
-	timeout = time.Second * 30
+	timeout = time.Second * 60
 )
 
 func TestNodes(t *testing.T) {
