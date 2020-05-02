@@ -77,6 +77,10 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 	if balChanged {
 		fmt.Println("💸 Sent payment. New balance:", state.Allocation.Balances[0])
 	}
+	if err == nil {
+		ch.lastState = state
+	}
+
 	return err
 }
 

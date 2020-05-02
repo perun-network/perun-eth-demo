@@ -431,7 +431,7 @@ func (n *node) settle(p *peer) error {
 	}
 	p.ch.log.Debug("Removing channel")
 	p.ch = nil
-	println("🏁 Settled channel with", p.alias)
+	fmt.Println("🏁 Settled channel with", p.alias)
 
 	return nil
 }

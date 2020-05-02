@@ -23,7 +23,7 @@ type logCfg struct {
 
 var logConfig logCfg
 
-func SetConfig() {
+func setConfig() {
 	lvl, err := logrus.ParseLevel(logConfig.Level)
 	if err != nil {
 		log.Fatal(errors.WithMessage(err, "parsing log level"))

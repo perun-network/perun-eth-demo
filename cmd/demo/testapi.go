@@ -13,34 +13,35 @@ import (
 	"perun.network/go-perun/log"
 )
 
-// TestAPI has an
-type TestAPI struct {
+type testAPI struct {
 	listener net.Listener
 	closed   chan interface{}
 }
 
-var api *TestAPI
+var api *testAPI
 
+// StartTestAPI sets the package variable `api` to a new `testAPI`
+// listening at 0.0.0.0:8080. Should be called after setting up the node.
 func StartTestAPI() {
-	api = NewTestAPI("0.0.0.0:8080")
+	api = newTestAPI("0.0.0.0:8080")
 }
 
-func NewTestAPI(url string) *TestAPI {
+func newTestAPI(url string) *testAPI {
 	l, err := net.Listen("tcp", url)
 	if err != nil {
 		log.Panic("TCP listening: ", err.Error())
 	}
 	log.Info("Listening on: " + url)
-	ret := &TestAPI{listener: l, closed: make(chan interface{})}
+	ret := &testAPI{listener: l, closed: make(chan interface{})}
 	go ret.startHandling()
 	return ret
 }
 
-func (a *TestAPI) Close() {
+func (a *testAPI) close() {
 	close(a.closed)
 }
 
-func (a *TestAPI) startHandling() {
+func (a *testAPI) startHandling() {
 	log.Trace("Started handling API requests")
 	for {
 		select {
@@ -58,7 +59,7 @@ func (a *TestAPI) startHandling() {
 	}
 }
 
-func (a *TestAPI) handleConnection(conn net.Conn) {
+func (a *testAPI) handleConnection(conn net.Conn) {
 	for {
 		select {
 		case <-a.closed:
@@ -78,7 +79,7 @@ func (a *TestAPI) handleConnection(conn net.Conn) {
 	}
 }
 
-func (a *TestAPI) execRequest(req string, conn net.Conn) string {
+func (a *testAPI) execRequest(req string, conn net.Conn) string {
 	if req == "getbals" {
 		data, err := json.Marshal(backend.GetBals())
 		if err != nil {
