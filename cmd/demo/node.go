@@ -52,6 +52,7 @@ type node struct {
 	// Account for signing off-chain TX. Currently one Account for all
 	// state channels, later one we want one Account per Channel.
 	offChain wallet.Account
+	wallet   *ewallet.Wallet
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
@@ -83,6 +84,7 @@ func newNode() (*node, error) {
 	n := &node{
 		log:     log.Get(),
 		onChain: acc,
+		wallet:  wallet,
 		dialer:  dialer,
 		cb:      echannel.NewContractBackend(backend, wallet.Ks, &acc.Account),
 		peers:   make(map[string]*peer),
@@ -231,12 +233,10 @@ func (n *node) setupContracts() (err error) {
 // listen listen for incoming TCP connections and print the configuration, since this is
 // the last step of the startup for a node.
 func (n *node) listen() error {
-	// here we simulate the generation of a new account from a wallet
-	rng := rand.New(rand.NewSource(int64(time.Now().UnixNano()))) // <- not secure
-	n.offChain = wtest.NewRandomAccount(rng)
+	n.offChain = n.wallet.NewAccount()
 	n.log.WithField("off-chain", n.offChain.Address()).Info("Generating account")
 
-	n.client = client.New(n.onChain, n.dialer, n.funder, n.adjudicator)
+	n.client = client.New(n.onChain, n.dialer, n.funder, n.adjudicator, n.wallet)
 	host := config.Node.IP + ":" + strconv.Itoa(int(config.Node.Port))
 	n.log.WithField("host", host).Trace("Listening for connections")
 	listener, err := net.NewTCPListener(host)
@@ -288,7 +288,7 @@ func findConfig(id wallet.Address) (string, *netConfigEntry) {
 	return "", nil
 }
 
-func (n *node) Handle(req *client.ChannelProposalReq, res *client.ProposalResponder) {
+func (n *node) Handle(req *client.ChannelProposal, res *client.ProposalResponder) {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
@@ -315,7 +315,7 @@ func (n *node) Handle(req *client.ChannelProposalReq, res *client.ProposalRespon
 	n.log.WithField("from", id).Debug("Channel propsal")
 
 	_ch, err := res.Accept(ctx, client.ProposalAcc{
-		Participant: n.offChain,
+		Participant: n.offChain.Address(),
 	})
 	if err != nil {
 		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
@@ -362,7 +362,7 @@ func (n *node) Open(args []string) error {
 	prop := &client.ChannelProposal{
 		ChallengeDuration: config.Channel.ChallengeDurationSec,
 		Nonce:             nonce(),
-		Account:           n.offChain,
+		ParticipantAddr:   n.offChain.Address(),
 		AppDef:            payment.AppDef(),
 		InitData:          new(payment.NoData),
 		InitBals:          initBals,
