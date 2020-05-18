@@ -13,14 +13,15 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
 	"perun.network/go-perun/log"
 	"perun.network/go-perun/wallet"
 )
 
 func valBal(input string) error {
-	_, err := strconv.ParseInt(input, 10, 32)
-	return errors.WithMessage(err, "Invalid Float")
+	_, _, err := big.ParseFloat(input, 10, 64, big.ToNearestEven)
+	return errors.Wrap(err, "parsing float")
 }
 
 func valString(input string) error {
@@ -92,4 +93,25 @@ func nonce() *big.Int {
 		log.Panic("Could not create nonce")
 	}
 	return val
+}
+
+// etherToWei converts amount in "ether" (represented as float) to "wei" (represented as integer).
+// It can provide exact results for values in the range of 1e-18 to 1e9.
+func etherToWei(ethers ...*big.Float) []*big.Int {
+	weis := make([]*big.Int, len(ethers))
+	for idx, ether := range ethers {
+		weiFloat := new(big.Float).Mul(ether, new(big.Float).SetFloat64(params.Ether))
+		// accuracy (second return value) returns "exact" for specified input range, hence ignored.
+		weis[idx], _ = weiFloat.Int(nil)
+	}
+	return weis
+}
+
+// weiToEther converts amount in "wei" (represented as integer) to "ether" (represented as float).
+func weiToEther(weis ...*big.Int) []*big.Float {
+	ethers := make([]*big.Float, len(weis))
+	for idx, wei := range weis {
+		ethers[idx] = new(big.Float).Quo(new(big.Float).SetInt(wei), new(big.Float).SetFloat64(params.Ether))
+	}
+	return ethers
 }
