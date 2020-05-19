@@ -187,7 +187,7 @@ func (n *node) PrintConfig() error {
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
 // or an error.
 func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.DeployTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	adjAddr, err := echannel.DeployAdjudicator(ctx, cb)
 	return adjAddr, errors.WithMessage(err, "deploying eth adjudicator")
@@ -196,7 +196,7 @@ func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
 // deployAsset deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
 func deployAsset(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.DeployTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator)
 	return asset, errors.WithMessage(err, "deploying eth assetholder")
@@ -460,7 +460,7 @@ func (n *node) Info(args []string) error {
 	defer n.mtx.Unlock()
 	n.log.Traceln("Info...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.DeployTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
 	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy Ξ\tPeer Ξ\tMy On-Chain Ξ\tPeer On-Chain Ξ\t\n")

@@ -40,7 +40,7 @@ type nodeConfig struct {
 }
 
 type chainConfig struct {
-	DeployTimeout time.Duration
+	TxTimeout time.Duration
 
 	Adjudicator string
 	Assetholder string

@@ -18,7 +18,7 @@ chain:
   url: ws://127.0.0.1:8545
   adjudicator: deploy
   assetHolder: deploy
-  deployTimeout: 30s
+  txTimeout: 30s
 
 log:
   level: warn
