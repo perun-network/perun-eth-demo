@@ -74,8 +74,10 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 		ActorIdx: ch.Idx(),
 	})
 	ch.log.Debugf("Sent update: %s, err: %v", desc, err)
+
 	if balChanged {
-		fmt.Println("💸 Sent payment. New balance:", state.Allocation.Balances[0])
+		bals := weiToEther(state.Allocation.Balances[0]...)
+		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	}
 	if err == nil {
 		ch.lastState = state
@@ -107,7 +109,8 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 	}
 
 	if balChanged {
-		fmt.Println("\n💰 Received payment. New balance:", update.State.Allocation.Balances[0])
+		bals := weiToEther(update.State.Allocation.Balances[0]...)
+		fmt.Printf("\n💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	}
 	if update.State.IsFinal {
 		ch.log.Trace("Calling onFinal handler for paymentChannel")

@@ -67,7 +67,10 @@ type node struct {
 	peers map[string]*peer
 }
 
-var backend *node
+var (
+	backend         *node
+	ethereumBackend *ethclient.Client
+)
 
 func newNode() (*node, error) {
 	wallet, acc, err := importAccount(config.SecretKey)
@@ -76,7 +79,7 @@ func newNode() (*node, error) {
 	}
 
 	dialer := net.NewTCPDialer(config.Node.DialTimeout)
-	backend, err := ethclient.Dial(config.Chain.URL)
+	ethereumBackend, err = ethclient.Dial(config.Chain.URL)
 	if err != nil {
 		return nil, errors.WithMessage(err, "connecting to ethereum node")
 	}
@@ -86,7 +89,7 @@ func newNode() (*node, error) {
 		onChain: acc,
 		wallet:  wallet,
 		dialer:  dialer,
-		cb:      echannel.NewContractBackend(backend, wallet.Ks, &acc.Account),
+		cb:      echannel.NewContractBackend(ethereumBackend, wallet.Ks, &acc.Account),
 		peers:   make(map[string]*peer),
 	}
 
@@ -120,6 +123,18 @@ func importAccount(secret string) (*ewallet.Wallet, *ewallet.Account, error) {
 	wAcc := ewallet.NewAccountFromEth(wallet, &ethAcc)
 	acc, err := wallet.Unlock(wAcc.Address())
 	return wallet, acc.(*ewallet.Account), err
+}
+
+func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, error) {
+	bals := make([]*big.Int, len(addrs))
+	var err error
+	for idx, addr := range addrs {
+		bals[idx], err = ethereumBackend.BalanceAt(ctx, ewallet.AsEthAddr(addr), nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "querying on-chain balance")
+		}
+	}
+	return bals, nil
 }
 
 func (n *node) Connect(args []string) error {
@@ -172,7 +187,7 @@ func (n *node) PrintConfig() error {
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
 // or an error.
 func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.DeployTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	adjAddr, err := echannel.DeployAdjudicator(ctx, cb)
 	return adjAddr, errors.WithMessage(err, "deploying eth adjudicator")
@@ -181,7 +196,7 @@ func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
 // deployAsset deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
 func deployAsset(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.DeployTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator)
 	return asset, errors.WithMessage(err, "deploying eth assetholder")
@@ -327,7 +342,10 @@ func (n *node) Handle(req *client.ChannelProposal, res *client.ProposalResponder
 		n.handleFinal(p)
 	})
 	go p.ch.ListenUpdates()
-	fmt.Println("\n🆕 Channel opened with", alias, " initial balance:", req.InitBals.Balances[0])
+
+	bals := weiToEther(req.InitBals.Balances[0]...)
+	fmt.Printf("\n🆕 Channel opened with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+		alias, bals[_ch.Idx()], bals[1-_ch.Idx()])
 }
 
 // handleFinal is called when the channel with peer `p` received a final update,
@@ -349,15 +367,12 @@ func (n *node) Open(args []string) error {
 	if peer == nil {
 		return errors.Errorf("peer not found %s", args[0])
 	}
-	myBals, _ := strconv.ParseInt(args[1], 10, 32) // error already checked by validator
-	peerBals, _ := strconv.ParseInt(args[2], 10, 32)
+	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
+	peerBalEth, _ := new(big.Float).SetString(args[2])
 
 	initBals := &channel.Allocation{
-		Assets: []channel.Asset{n.asset},
-		Balances: [][]*big.Int{
-			{big.NewInt(myBals),
-				big.NewInt(peerBals)},
-		},
+		Assets:   []channel.Asset{n.asset},
+		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
 	prop := &client.ChannelProposal{
 		ChallengeDuration: config.Channel.ChallengeDurationSec,
@@ -383,6 +398,8 @@ func (n *node) Open(args []string) error {
 	})
 	go peer.ch.ListenUpdates()
 
+	fmt.Printf("🆕 Channel opened with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+		peer.alias, myBalEth, peerBalEth)
 	return nil
 }
 
@@ -397,8 +414,8 @@ func (n *node) Send(args []string) error {
 	} else if peer.ch == nil {
 		return errors.Errorf("connect to peer first")
 	}
-	wei, _ := strconv.ParseInt(args[1], 10, 32)
-	return peer.ch.sendMoney(big.NewInt(wei))
+	amountEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
+	return peer.ch.sendMoney(etherToWei(amountEth)[0])
 }
 
 func (n *node) Close(args []string) error {
@@ -422,6 +439,7 @@ func (n *node) settle(p *peer) error {
 	p.ch.log.Debug("Settling")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
+	finalBals := weiToEther(p.ch.GetBalances())
 	if err := p.ch.Settle(ctx); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}
@@ -431,7 +449,7 @@ func (n *node) settle(p *peer) error {
 	}
 	p.ch.log.Debug("Removing channel")
 	p.ch = nil
-	fmt.Println("🏁 Settled channel with", p.alias)
+	fmt.Printf("\n🏁 Settled channel with %s. Final Balance: [My: %v Ξ, Peer: %v Ξ]\n", p.alias, finalBals[0], finalBals[1])
 
 	return nil
 }
@@ -442,15 +460,22 @@ func (n *node) Info(args []string) error {
 	defer n.mtx.Unlock()
 	n.log.Traceln("Info...")
 
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
+	defer cancel()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
-	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy Ξ\tPeer Ξ\t\n")
+	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy Ξ\tPeer Ξ\tMy On-Chain Ξ\tPeer On-Chain Ξ\t\n")
 	for alias, peer := range n.peers {
+		onChainBals, err := getOnChainBal(ctx, n.onChain.Address(), peer.perunID)
+		if err != nil {
+			return err
+		}
+		onChainBalsEth := weiToEther(onChainBals...)
 		if peer.ch == nil {
-			fmt.Fprintf(w, "%s\t%s\t\n", alias, "Connected")
+			fmt.Fprintf(w, "%s\t%s\t \t \t \t%v\t%v\t\n", alias, "Connected", onChainBalsEth[0], onChainBalsEth[1])
 		} else {
-			my, other := peer.ch.GetBalances()
-			fmt.Fprintf(w, "%s\t%v\t%d\t%v\t%v\t\n",
-				alias, peer.ch.Phase(), peer.ch.State().Version, my, other)
+			bals := weiToEther(peer.ch.GetBalances())
+			fmt.Fprintf(w, "%s\t%v\t%d\t%v\t%v\t%v\t%v\t\n",
+				alias, peer.ch.Phase(), peer.ch.State().Version, bals[0], bals[1], onChainBalsEth[0], onChainBalsEth[1])
 		}
 	}
 	fmt.Fprintln(w)
