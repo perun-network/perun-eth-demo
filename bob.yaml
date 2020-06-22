@@ -1,6 +1,6 @@
 alias: bob
 secretKey: 0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9
-walletPath: /tmp/alice_wallet
+walletPath: /tmp/bob_wallet
 
 channel:
   timeout: 30s
@@ -10,9 +10,11 @@ channel:
 
 node:
   ip: 0.0.0.0
-  port: 1337
+  port: 5750
   dialTimeout: 30s
   handleTimeout: 30s
+  reconnectTimeout: 20s
+  persistencePath: /tmp/bob_database
 
 chain:
   url: ws://127.0.0.1:8545

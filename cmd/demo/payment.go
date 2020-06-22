@@ -36,6 +36,12 @@ type (
 )
 
 func newPaymentChannel(ch *client.Channel, onFinal func()) *paymentChannel {
+	go func() {
+		l := log.WithField("channel", ch.ID())
+		l.Debug("Watcher started")
+		err := ch.Watch()
+		l.WithError(err).Debug("Watcher stopped")
+	}()
 	return &paymentChannel{
 		Channel:   ch,
 		log:       log.WithField("channel", ch.ID()),
@@ -117,12 +123,6 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 		go ch.onFinal()
 	}
 	ch.lastState = update.State.Clone()
-}
-
-func (ch *paymentChannel) ListenUpdates() {
-	ch.log.Debug("Listening for channel updates")
-	ch.Channel.ListenUpdates(ch)
-	ch.log.Debug("Stopped listening for channel updates")
 }
 
 func (ch *paymentChannel) GetBalances() (our, other *big.Int) {

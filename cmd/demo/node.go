@@ -9,18 +9,13 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"os"
 	"strconv"
 	"sync"
 	"text/tabwriter"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
 	"perun.network/go-perun/apps/payment"
@@ -30,15 +25,16 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
+	perunpeer "perun.network/go-perun/peer"
 	"perun.network/go-perun/peer/net"
 	"perun.network/go-perun/wallet"
-	wtest "perun.network/go-perun/wallet/test"
 )
 
 type peer struct {
 	alias   string
-	perunID wallet.Address
+	perunID perunpeer.Address
 	ch      *paymentChannel
+	log     log.Logger
 }
 
 type node struct {
@@ -65,64 +61,6 @@ type node struct {
 	// Protects peers
 	mtx   sync.Mutex
 	peers map[string]*peer
-}
-
-var (
-	backend         *node
-	ethereumBackend *ethclient.Client
-)
-
-func newNode() (*node, error) {
-	wallet, acc, err := importAccount(config.SecretKey)
-	if err != nil {
-		return nil, errors.WithMessage(err, "importing secret key")
-	}
-
-	dialer := net.NewTCPDialer(config.Node.DialTimeout)
-	ethereumBackend, err = ethclient.Dial(config.Chain.URL)
-	if err != nil {
-		return nil, errors.WithMessage(err, "connecting to ethereum node")
-	}
-
-	n := &node{
-		log:     log.Get(),
-		onChain: acc,
-		wallet:  wallet,
-		dialer:  dialer,
-		cb:      echannel.NewContractBackend(ethereumBackend, wallet.Ks, &acc.Account),
-		peers:   make(map[string]*peer),
-	}
-
-	if err := n.setupContracts(); err != nil {
-		return nil, errors.WithMessage(err, "setting up contracts")
-	}
-	return n, n.listen()
-}
-
-// importAccount is a helper method to import secret keys until we have the ethereum wallet done.
-func importAccount(secret string) (*ewallet.Wallet, *ewallet.Account, error) {
-	ks := keystore.NewKeyStore(config.WalletPath, 2, 1)
-	sk, err := crypto.HexToECDSA(secret[2:])
-	if err != nil {
-		return nil, nil, errors.WithMessage(err, "decoding secret key")
-	}
-	var ethAcc accounts.Account
-	addr := crypto.PubkeyToAddress(sk.PublicKey)
-	if ethAcc, err = ks.Find(accounts.Account{Address: addr}); err != nil {
-		ethAcc, err = ks.ImportECDSA(sk, "")
-		if err != nil && errors.Cause(err).Error() != "account already exists" {
-			return nil, nil, errors.WithMessage(err, "importing secret key")
-		}
-	}
-
-	wallet, err := ewallet.NewWallet(ks, "")
-	if err != nil {
-		return nil, nil, errors.WithMessage(err, "creating wallet")
-	}
-
-	wAcc := ewallet.NewAccountFromEth(wallet, &ethAcc)
-	acc, err := wallet.Unlock(wAcc.Address())
-	return wallet, acc.(*ewallet.Account), err
 }
 
 func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, error) {
@@ -165,113 +103,36 @@ func (n *node) Connect(args []string) error {
 	return nil
 }
 
-func (n *node) PrintConfig() error {
-	fmt.Printf(
-		"Alias: %s\n"+
-			"Listening: %s:%d\n"+
-			"ETH RPC URL: %s\n"+
-			"Perun ID: %s\n"+
-			"OffChain: %s\n"+
-			"ETHAssetHolder: %s\n"+
-			"Adjudicator: %s\n"+
-			"", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), n.assetAddr.String(), n.adjAddr.String())
-
-	fmt.Println("Known peers:")
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.TabIndent)
-	for alias, peer := range config.Peers {
-		fmt.Fprintf(w, "%s\t%v\t%s:%d\n", alias, peer.PerunID, peer.Hostname, peer.Port)
-	}
-	return w.Flush()
-}
-
-// deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
-// or an error.
-func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
-	defer cancel()
-	adjAddr, err := echannel.DeployAdjudicator(ctx, cb)
-	return adjAddr, errors.WithMessage(err, "deploying eth adjudicator")
-}
-
-// deployAsset deploys the Assetholder to the blockchain and returns its address
-// or an error. Needs an Adjudicator address as second argument.
-func deployAsset(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
-	defer cancel()
-	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator)
-	return asset, errors.WithMessage(err, "deploying eth assetholder")
-}
-
-// setupContracts reads from the config file whether the node should deploy or use
-// existing contract addresses.
-func (n *node) setupContracts() (err error) {
-	var adjAddr, assAddr common.Address
-
-	if config.Chain.Adjudicator == "deploy" {
-		adjAddr, err = deployAdjudicator(n.cb)
-		if err != nil {
-			return
-		}
-	} else {
-		tmpAdj, err := strToAddress(config.Chain.Adjudicator)
-		if err != nil {
-			return err
-		}
-		adjAddr = ewallet.AsEthAddr(tmpAdj)
-	}
-
-	if config.Chain.Assetholder == "deploy" {
-		assAddr, err = deployAsset(n.cb, adjAddr)
-		if err != nil {
-			return
-		}
-	} else {
-		tmpAsset, err := strToAddress(config.Chain.Assetholder)
-		if err != nil {
-			return err
-		}
-		assAddr = ewallet.AsEthAddr(tmpAsset)
-	}
-	n.adjAddr = adjAddr
-	n.assetAddr = assAddr
-
-	var recvAddr common.Address
-	recvAddr.SetBytes(n.onChain.Address().Bytes())
-
-	n.adjudicator = echannel.NewAdjudicator(n.cb, adjAddr, recvAddr)
-	n.funder = echannel.NewETHFunder(n.cb, assAddr)
-	n.asset = (*ewallet.Address)(&assAddr)
-	n.log.WithField("Adj", adjAddr).WithField("Asset", assAddr).Debug("Set contracts")
-	return
-}
-
-// listen listen for incoming TCP connections and print the configuration, since this is
-// the last step of the startup for a node.
-func (n *node) listen() error {
-	n.offChain = n.wallet.NewAccount()
-	n.log.WithField("off-chain", n.offChain.Address()).Info("Generating account")
-
-	n.client = client.New(n.onChain, n.dialer, n.funder, n.adjudicator, n.wallet)
-	host := config.Node.IP + ":" + strconv.Itoa(int(config.Node.Port))
-	n.log.WithField("host", host).Trace("Listening for connections")
-	listener, err := net.NewTCPListener(host)
-	if err != nil {
-		return errors.WithMessage(err, "could not start tcp listener")
-	}
-	go n.client.HandleChannelProposals(n)
-	go n.client.Listen(listener)
-	n.PrintConfig()
-	return nil
-}
-
-// getPeer returns the peer with the address `addr` or nil if not found.
-func (n *node) getPeer(addr wallet.Address) *peer {
+// peer returns the peer with the address `addr` or nil if not found.
+func (n *node) peer(addr perunpeer.Address) *peer {
 	for _, peer := range n.peers {
-		if peer.perunID == addr {
+		if peer.perunID.Equals(addr) {
 			return peer
 		}
 	}
 	return nil
+}
+
+func (n *node) setupChannel(ch *client.Channel) {
+	perunID := ch.Peers()[0]
+	p := n.peer(perunID)
+
+	if p == nil {
+		log.WithField("peer", perunID).Warn("Opened channel to unknown peer")
+		return
+	} else if p.ch != nil {
+		p.log.Warn("Peer tried to open more than one channel")
+		return
+	}
+
+	// This also starts the watcher.
+	p.ch = newPaymentChannel(ch, func() {
+		n.handleFinal(p)
+	})
+
+	bals := weiToEther(ch.State().Balances[0]...)
+	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+		p.alias, bals[ch.Idx()], bals[1-ch.Idx()])
 }
 
 type balTuple struct {
@@ -292,8 +153,6 @@ func (n *node) GetBals() map[string]balTuple {
 	return bals
 }
 
-var aliasCounter int
-
 func findConfig(id wallet.Address) (string, *netConfigEntry) {
 	for alias, e := range config.Peers {
 		if e.perunID.String() == id.String() {
@@ -303,7 +162,30 @@ func findConfig(id wallet.Address) (string, *netConfigEntry) {
 	return "", nil
 }
 
-func (n *node) Handle(req *client.ChannelProposal, res *client.ProposalResponder) {
+func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResponder) {
+	n.mtx.Lock()
+	defer n.mtx.Unlock()
+	log := n.log.WithField("channel", update.State.ID)
+	log.Debug("Channel update")
+
+	ch := n.channel(update.State.ID)
+	if ch == nil {
+		log.Error("Channel for ID not found")
+		return
+	}
+	ch.Handle(update, resp)
+}
+
+func (n *node) channel(id channel.ID) *paymentChannel {
+	for _, p := range n.peers {
+		if p.ch != nil && p.ch.ID() == id {
+			return p.ch
+		}
+	}
+	return nil
+}
+
+func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalResponder) {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
@@ -312,7 +194,7 @@ func (n *node) Handle(req *client.ChannelProposal, res *client.ProposalResponder
 	n.log.Debug("Received channel propsal")
 
 	// Find the peer by its perunID and create it if not present
-	p := n.getPeer(id)
+	p := n.peer(id)
 	alias, cfg := findConfig(id)
 
 	if p == nil {
@@ -325,27 +207,16 @@ func (n *node) Handle(req *client.ChannelProposal, res *client.ProposalResponder
 			perunID: id,
 		}
 		n.peers[alias] = p
-		n.log.WithField("id", id).WithField("alias", alias).Debug("New peer")
+		n.log.WithField("channel", id).WithField("alias", alias).Debug("New peer")
 	}
-	n.log.WithField("from", id).Debug("Channel propsal")
+	n.log.WithField("peer", id).Debug("Channel propsal")
 
-	_ch, err := res.Accept(ctx, client.ProposalAcc{
+	if _, err := res.Accept(ctx, client.ProposalAcc{
 		Participant: n.offChain.Address(),
-	})
-	if err != nil {
+	}); err != nil {
 		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 		return
 	}
-
-	// Add the channel to the peer and start listening for updates
-	p.ch = newPaymentChannel(_ch, func() {
-		n.handleFinal(p)
-	})
-	go p.ch.ListenUpdates()
-
-	bals := weiToEther(req.InitBals.Balances[0]...)
-	fmt.Printf("\n🆕 Channel opened with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
-		alias, bals[_ch.Idx()], bals[1-_ch.Idx()])
 }
 
 // handleFinal is called when the channel with peer `p` received a final update,
@@ -387,19 +258,13 @@ func (n *node) Open(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()
 	n.log.Debug("Proposing channel")
-	_ch, err := n.client.ProposeChannel(ctx, prop)
+	ch, err := n.client.ProposeChannel(ctx, prop)
 	if err != nil {
 		return errors.WithMessage(err, "proposing channel failed")
 	}
-	n.log.Debug("Proposing done")
-
-	peer.ch = newPaymentChannel(_ch, func() {
-		n.handleFinal(peer)
-	})
-	go peer.ch.ListenUpdates()
-
-	fmt.Printf("🆕 Channel opened with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
-		peer.alias, myBalEth, peerBalEth)
+	if n.channel(ch.ID()) == nil {
+		return errors.New("OnNewChannel handler could not setup channel")
+	}
 	return nil
 }
 
@@ -497,19 +362,4 @@ func (n *node) ExistsPeer(alias string) bool {
 	defer n.mtx.Unlock()
 
 	return n.peers[alias] != nil
-}
-
-// Setup initializes the node, can not be done init() since it needs the configuration
-// from viper.
-func Setup() {
-	SetConfig()
-	rng := rand.New(rand.NewSource(0x280a0f350eec))
-	appDef := wtest.NewRandomAddress(rng)
-	payment.SetAppDef(appDef)
-
-	b, err := newNode()
-	if err != nil {
-		log.Fatalln("init error:", err)
-	}
-	backend = b
 }
