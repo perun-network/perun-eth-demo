@@ -33,10 +33,14 @@ type channelConfig struct {
 }
 
 type nodeConfig struct {
-	IP            string
-	Port          uint16
-	DialTimeout   time.Duration
-	HandleTimeout time.Duration
+	IP              string
+	Port            uint16
+	DialTimeout     time.Duration
+	HandleTimeout   time.Duration
+	ReconnecTimeout time.Duration
+
+	PersistencePath    string
+	PersistenceEnabled bool
 }
 
 type chainConfig struct {

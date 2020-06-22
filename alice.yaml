@@ -13,6 +13,8 @@ node:
   port: 5751
   dialTimeout: 30s
   handleTimeout: 30s
+  reconnectTimeout: 20s
+  persistencePath: /tmp/alice_database
 
 chain:
   url: ws://127.0.0.1:8545

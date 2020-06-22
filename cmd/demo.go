@@ -30,6 +30,7 @@ var testAPI bool
 func init() {
 	rootCmd.AddCommand(demoCmd)
 	demoCmd.PersistentFlags().BoolVar(&testAPI, "test-api", false, "Expose testing API at 8080")
+	demoCmd.PersistentFlags().BoolVar(&demo.GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
 	demoCmd.PersistentFlags().StringVar(&demo.GetConfig().SecretKey, "sk", "", "ETH Secret Key")
 	viper.BindPFlag("secretkey", demoCmd.PersistentFlags().Lookup("sk"))
 }
