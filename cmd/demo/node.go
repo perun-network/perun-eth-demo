@@ -98,6 +98,7 @@ func (n *node) Connect(args []string) error {
 	n.peers[alias] = &peer{
 		alias:   alias,
 		perunID: peerCfg.perunID,
+		log:     log.WithField("peer", peerCfg.perunID),
 	}
 
 	return nil
@@ -205,6 +206,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 		p = &peer{
 			alias:   alias,
 			perunID: id,
+			log:     log.WithField("peer", id),
 		}
 		n.peers[alias] = p
 		n.log.WithField("channel", id).WithField("alias", alias).Debug("New peer")
