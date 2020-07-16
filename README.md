@@ -19,7 +19,7 @@ The authors take no responsibility for any loss of digital assets or other damag
 
 ## Getting Started
 
-Running _perun-eth-demo_ requires a working Go distribution (version 1.14 or higher).   
+Running _perun-eth-demo_ requires a working Go distribution (version 1.14 or higher). Optionally, [ganache-cli](https://github.com/trufflesuite/ganache-cli) needs to be installed for following the walkthrough. _perun-eth-demo_ works with any ethereum node.
 ```sh
 # Clone the repository into a directory of your choice
 git clone https://github.com/perun-network/perun-eth-demo
@@ -44,14 +44,13 @@ the accounts of `Alice` and `Bob`:
 ganache-cli --account="0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a,100000000000000000000000" --account="0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9,100000000000000000000000"
 ```
 
-In a second and third terminal, cd inside folder `perun` of `go-perun` and start
-the nodes of Alice and Bob with
+In a second and third terminal, start the nodes of Alice and Bob with
 ```sh
-./perun-eth-demo main.go demo --config alice.yaml
+./perun-eth-demo demo --config alice.yaml
 ```
 and
 ```sh
-./perun-eth-demo main.go demo --config bob.yaml
+./perun-eth-demo demo --config bob.yaml
 ```
 You can see two transaction in the ganache terminal, which correspond to the
 deployment of the `AssetHolder` and `Adjudicator` contracts.
