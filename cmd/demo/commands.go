@@ -88,6 +88,10 @@ func init() {
 // Executor interprets commands entered by the user.
 // Gets called by Cobra, but could also be used for emulating user input.
 func Executor(in string) error {
+	if in == "" {
+		return nil
+	}
+
 	in = strings.TrimSpace(in)
 	args := strings.Split(in, " ")
 	command := args[0]
