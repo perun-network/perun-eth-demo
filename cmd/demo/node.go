@@ -98,6 +98,8 @@ func (n *node) Connect(args []string) error {
 		log:     log.WithField("peer", peerCfg.perunID),
 	}
 
+	fmt.Printf("📡 Connected to %v. Ready to open channel.\n", alias)
+
 	return nil
 }
 
@@ -143,7 +145,7 @@ func (n *node) setupChannel(ch *client.Channel) {
 	}()
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	fmt.Printf("\n🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
@@ -254,11 +256,15 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
+	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+
 	a := req.Accept(n.offChain.Address(), client.WithRandomNonce())
 	if _, err := res.Accept(ctx, a); err != nil {
 		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 		return
 	}
+
+	fmt.Println("✅ Channel proposal accepted")
 }
 
 func (n *node) Open(args []string) error {
@@ -286,6 +292,8 @@ func (n *node) Open(args []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "creating channel proposal")
 	}
+
+	fmt.Printf("💭 Proposing channel to %v...\n", peerName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()
