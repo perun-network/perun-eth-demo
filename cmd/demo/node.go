@@ -99,6 +99,8 @@ func (n *node) Connect(args []string) error {
 		log:     log.WithField("peer", peerCfg.perunID),
 	}
 
+	fmt.Printf("📡 Connected to %v. Ready to open channel.\n", alias)
+
 	return nil
 }
 
@@ -134,7 +136,7 @@ func (n *node) setupChannel(ch *client.Channel) {
 	})
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	fmt.Printf("\n🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
@@ -171,6 +173,8 @@ func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResp
 	log := n.log.WithField("channel", update.State.ID)
 	log.Debug("Channel update")
 
+	fmt.Println("\n💭 Received channel update")
+
 	ch := n.channel(update.State.ID)
 	if ch == nil {
 		log.Error("Channel for ID not found")
@@ -188,6 +192,7 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 	return nil
 }
 
+// HandleProposal is called when a new channel is proposed
 func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalResponder) {
 	if len(req.PeerAddrs) != 2 {
 		log.Fatal("Only channels with two participants are currently supported")
@@ -219,12 +224,17 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
+	// TODO: implement print balance with support for arbitrary number of participants
+	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+
 	if _, err := res.Accept(ctx, client.ProposalAcc{
 		Participant: n.offChain.Address(),
 	}); err != nil {
 		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 		return
 	}
+
+	fmt.Println("✅ Channel proposal accepted")
 }
 
 // handleFinal is called when the channel with peer `p` received a final update,
@@ -263,6 +273,9 @@ func (n *node) Open(args []string) error {
 		PeerAddrs:         []wallet.Address{n.onChain.Address(), peer.perunID},
 	}
 
+	alias := args[0]
+	fmt.Printf("💭 Proposing channel to %v...\n", alias)
+
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()
 	n.log.Debug("Proposing channel")
@@ -273,6 +286,7 @@ func (n *node) Open(args []string) error {
 	if n.channel(ch.ID()) == nil {
 		return errors.New("OnNewChannel handler could not setup channel")
 	}
+
 	return nil
 }
 
