@@ -107,8 +107,8 @@ func Executor(in string) error {
 			return cmd.Function(args)
 		}
 	}
-	if command != "" {
-		return errors.Errorf("Unknown command: %s", command)
+	if len(command) > 0 {
+		return errors.Errorf("Unknown command: %s. Enter \"help\" for a list of commands.", command)
 	}
 	return nil
 }
