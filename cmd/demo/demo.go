@@ -6,8 +6,6 @@
 package demo
 
 import (
-	"fmt"
-
 	prompt "github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,7 +65,5 @@ func completer(prompt.Document) []prompt.Suggest {
 
 // executor wraps the demo executor to print error messages.
 func executor(in string) {
-	if err := Executor(in); err != nil {
-		fmt.Println("\033[0;33m⚡\033[0m", err)
-	}
+	AddInput(in)
 }

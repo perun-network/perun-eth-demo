@@ -61,9 +61,14 @@ Once both CLIs are running, e.g. in Alice's terminal, connect to bob with
 ```
 > connect bob
 ```
-Then open a payment channel with 100 ETH deposit from both sides with
+Then propose a payment channel with 100 ETH deposit from both sides with
 ```
 > open bob 100 100
+```
+In Alice's terminal, accept the appearing channel proposal.
+```
+🔁 Incoming channel proposal from alice with funding [My: 10 Ξ, Peer: 10 Ξ].
+Accept (y/n)? > y
 ```
 In the ganache terminal, you can see two new transactions, which correspond to
 the funding transactions by Alice and Bob.

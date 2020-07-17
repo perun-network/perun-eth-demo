@@ -94,7 +94,7 @@ func (a *testAPI) execRequest(req string, conn net.Conn) string {
 			return err.Error()
 		}
 		return string(data)
-	} else if err := Executor(req); err != nil {
+	} else if err := Execute(req); err != nil {
 		return err.Error()
 	}
 	return "OK"

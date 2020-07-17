@@ -27,8 +27,11 @@ type command struct {
 }
 
 var commands []command
+var cmdInput chan string
 
 func init() {
+	cmdInput = make(chan string, 1)
+
 	commands = []command{
 		{
 			"connect",
@@ -85,9 +88,46 @@ func init() {
 	}
 }
 
-// Executor interprets commands entered by the user.
-// Gets called by Cobra, but could also be used for emulating user input.
-func Executor(in string) error {
+var asyncInputRequest chan struct{} = make(chan struct{})
+var asyncInput chan string = make(chan string, 1)
+var done chan struct{}
+
+// AddInput adds an input to the input command queue.
+func AddInput(in string) {
+	done = make(chan struct{})
+	select {
+	case <-asyncInputRequest:
+		// If there is event handler waiting for input, forward input.
+		asyncInput <- in
+	default:
+		go func() {
+			if err := Execute(in); err != nil {
+				fmt.Println("\033[0;33m⚡\033[0m", err)
+			}
+			close(done)
+		}()
+	}
+	<-done
+}
+
+// Prompt waits for input on the command line and then executes the given
+// function with the input.
+func Prompt(msg string, f func(string)) {
+	PrintfAsync(msg)
+	asyncInputRequest <- struct{}{}
+	f(<-asyncInput)
+	close(done)
+}
+
+// PrintfAsync prints the given message for an asynchronous event. More
+// precisely, the message is prepended with a newline and appended with the
+// command prefix.
+func PrintfAsync(format string, a ...interface{}) {
+	fmt.Printf("\r"+format+"> ", a...)
+}
+
+// Execute interprets commands entered by the user.
+func Execute(in string) error {
 	in = strings.TrimSpace(in)
 	args := strings.Split(in, " ")
 	command := args[0]
