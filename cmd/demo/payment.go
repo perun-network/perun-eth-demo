@@ -6,9 +6,11 @@
 package demo
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
@@ -75,6 +77,8 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 	state.Version++
 	balChanged := state.Balances[0][0].Cmp(ch.State().Balances[0][0]) != 0
 
+	fmt.Printf("💭 Proposing update and waiting for confirmation...\n")
+
 	err := ch.Update(ctx, client.ChannelUpdate{
 		State:    state,
 		ActorIdx: ch.Idx(),
@@ -108,21 +112,52 @@ func stateBals(state *channel.State) []channel.Bal {
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
 	oldBal := stateBals(ch.lastState)
 	balChanged := oldBal[0].Cmp(update.State.Balances[0][0]) != 0
-	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
-	defer cancel()
-	if err := res.Accept(ctx); err != nil {
-		ch.log.Error(errors.WithMessage(err, "handling payment update"))
+
+	actorAddress := ch.Peers()[update.ActorIdx]
+	alias, _ := findConfig(actorAddress)
+	if alias == "" {
+		alias = fmt.Sprintf("%v", actorAddress)
 	}
 
-	if balChanged {
-		bals := weiToEther(update.State.Allocation.Balances[0]...)
-		fmt.Printf("\n💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+	// TODO: implement print balance with support for arbitrary number of participants
+	// TODO: allow access to human readable participants names from other
+	fmt.Printf("\n💭 Received channel update proposal from %v with balances %v Ξ.\nEnter \"accept\" to accept, \"reject\" to reject.\n", alias, weiToEther(update.State.Balances[0]...))
+
+	// TODO: use prompt for input once available in package
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		ch.log.Error("reading user input")
+		return
 	}
-	if update.State.IsFinal {
-		ch.log.Trace("Calling onFinal handler for paymentChannel")
-		go ch.onFinal()
+	userInput := scanner.Text()
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
+	defer cancel()
+
+	if userInput == "accept" {
+
+		fmt.Println("✅ Channel update accepted")
+
+		if err := res.Accept(ctx); err != nil {
+			ch.log.Error(errors.WithMessage(err, "handling payment update"))
+		}
+
+		if balChanged {
+			bals := weiToEther(update.State.Allocation.Balances[0]...)
+			fmt.Printf("\n💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+		}
+		if update.State.IsFinal {
+			ch.log.Trace("Calling onFinal handler for paymentChannel")
+			go ch.onFinal()
+		}
+		ch.lastState = update.State.Clone()
+
+	} else {
+		if err := res.Reject(ctx, "update rejected by user"); err != nil {
+			ch.log.Error(errors.WithMessage(err, "rejecting update proposal"))
+		}
+		fmt.Println("❌ Channel update rejected")
 	}
-	ch.lastState = update.State.Clone()
 }
 
 func (ch *paymentChannel) GetBalances() (our, other *big.Int) {

@@ -174,8 +174,6 @@ func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResp
 	log := n.log.WithField("channel", update.State.ID)
 	log.Debug("Channel update")
 
-	fmt.Println("\n💭 Received channel update")
-
 	ch := n.channel(update.State.ID)
 	if ch == nil {
 		log.Error("Channel for ID not found")
@@ -319,6 +317,7 @@ func (n *node) Send(args []string) error {
 		return errors.Errorf("connect to peer first")
 	}
 	amountEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
+
 	return peer.ch.sendMoney(etherToWei(amountEth)[0])
 }
 
