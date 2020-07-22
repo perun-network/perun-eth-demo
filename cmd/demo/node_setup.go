@@ -113,12 +113,21 @@ func (n *node) setupContracts() (err error) {
 		if err != nil {
 			return
 		}
+		fmt.Println("💭 Adjudicator contract deployed")
 	} else {
 		tmpAdj, err := strToAddress(config.Chain.Adjudicator)
 		if err != nil {
 			return err
 		}
 		adjAddr = ewallet.AsEthAddr(tmpAdj)
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
+		defer cancel()
+		if err := echannel.ValidateAdjudicator(ctx, n.cb, adjAddr); err != nil {
+			return errors.WithMessage(err, "validating adjudicator contract")
+		}
+
+		fmt.Println("💭 Adjudicator contract validated")
 	}
 
 	if config.Chain.Assetholder == "deploy" {
@@ -126,12 +135,21 @@ func (n *node) setupContracts() (err error) {
 		if err != nil {
 			return
 		}
+		fmt.Println("💭 Asset holder contract deployed")
 	} else {
 		tmpAsset, err := strToAddress(config.Chain.Assetholder)
 		if err != nil {
 			return err
 		}
 		assAddr = ewallet.AsEthAddr(tmpAsset)
+
+		ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
+		defer cancel()
+		if err := echannel.ValidateAssetHolderETH(ctx, n.cb, assAddr, adjAddr); err != nil {
+			return errors.WithMessage(err, "validating asset holder contract")
+		}
+
+		fmt.Println("💭 Asset holder contract validated")
 	}
 	n.adjAddr = adjAddr
 	n.assetAddr = assAddr

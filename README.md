@@ -41,18 +41,20 @@ configuration for Alice and Bob is provided in file `network.yaml`.
 In a first terminal, start a `ganache-cli` development blockchain, prefunding
 the accounts of `Alice` and `Bob`:
 ```sh
-ganache-cli --account="0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a,100000000000000000000000" --account="0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9,100000000000000000000000"
+ganache-cli --account="0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9,100000000000000000000000" --account="0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a,100000000000000000000000"
 ```
 
-In a second and third terminal, start the nodes of Alice and Bob with
+In a second terminal, start the node of Alice with
 ```sh
 ./perun-eth-demo demo --config alice.yaml
 ```
-and
+and in a third terminal, start the node of Bob with
 ```sh
 ./perun-eth-demo demo --config bob.yaml
 ```
-You can see two transaction in the ganache terminal, which correspond to the
+It is important to start Alice first as she is the one deploying the channel contracts.
+Bob validates the contracts at startup and quits if the contracts have not been deployed correctly.
+You can see two transactions in the ganache terminal corresponding to the
 deployment of the `AssetHolder` and `Adjudicator` contracts.
 
 Once both CLIs are running, e.g. in Alice's terminal, connect to bob with
