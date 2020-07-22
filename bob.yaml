@@ -1,5 +1,5 @@
 alias: bob
-secretKey: 0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9
+secretKey: 0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a
 walletPath: /tmp/bob_wallet
 
 channel:
@@ -18,8 +18,8 @@ node:
 
 chain:
   url: ws://127.0.0.1:8545
-  adjudicator: deploy
-  assetHolder: deploy
+  adjudicator: 0xDc4A7e107aD6dBDA1870df34d70B51796BBd1335
+  assetholder: 0xb051EAD0C6CC2f568166F8fEC4f07511B88678bA
   txTimeout: 30s
 
 log:
