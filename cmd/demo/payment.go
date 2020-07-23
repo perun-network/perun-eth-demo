@@ -18,6 +18,7 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
+	perunio "perun.network/go-perun/pkg/io"
 )
 
 type (
@@ -129,6 +130,77 @@ func channelStateToString(state *channel.State) string {
 	return b.String()
 }
 
+func printStateDiff(oldState *channel.State, newState *channel.State) {
+	var b strings.Builder
+
+	if oldState.ID != newState.ID {
+		fmt.Fprintf(&b, "ChannelID = %x -> ChannelID = %x\n", oldState.ID, newState.ID)
+	}
+
+	if oldState.Version != newState.Version {
+		fmt.Fprintf(&b, "Version = %x -> Version = %x\n", oldState.Version, newState.Version)
+	}
+
+	if fmt.Sprintf("%v", oldState.App) != fmt.Sprintf("%v", newState.App) {
+		fmt.Fprintf(&b, "App = %x -> App = %x\n", oldState.App, newState.App)
+	}
+
+	encoderToBytes := func(encoder perunio.Encoder) []byte {
+		var buf bytes.Buffer
+		encoder.Encode(&buf)
+		return buf.Bytes()
+	}
+
+	assetsToString := func(assets []channel.Asset) string {
+		var b strings.Builder
+		fmt.Fprintf(&b, "[")
+		for _, asset := range assets {
+			fmt.Fprintf(&b, "%x, ", encoderToBytes(asset))
+		}
+		fmt.Fprintf(&b, "]")
+
+		return b.String()
+	}
+
+	assetsEqual := func(assets1 []channel.Asset, assets2 []channel.Asset) bool {
+		return assetsToString(assets1) == assetsToString(assets2)
+	}
+
+	if !assetsEqual(oldState.Assets, newState.Assets) {
+		fmt.Fprintf(&b, "Assets = %x -> Assets = %x\n", assetsToString(oldState.Assets), assetsToString(newState.Assets))
+	}
+
+	balancesEqual := func(balances1 [][]channel.Bal, balances2 [][]channel.Bal) bool {
+		if len(balances1) != len(balances2) {
+			return false
+		}
+
+		for i, balancesForAsset1 := range balances1 {
+			balancesForAsset2 := balances2[i]
+			if len(balancesForAsset1) != len(balancesForAsset2) {
+				return false
+			}
+			for j, balance1 := range balancesForAsset1 {
+				balance2 := balancesForAsset2[j]
+				if balance1 != balance2 {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	if !balancesEqual(oldState.Balances, newState.Balances) {
+		fmt.Fprintf(&b, "Balances = %v -> Balances = %v\n", oldState.Balances, newState.Balances)
+	}
+
+	if !bytes.Equal(encoderToBytes(oldState.Data), encoderToBytes(newState.Data)) {
+		fmt.Fprintf(&b, "Data = %x -> Data = %x\n", oldState.Data, newState.Data)
+	}
+
+	fmt.Println(b.String())
+}
+
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
 	oldBal := stateBals(ch.lastState)
 	balChanged := oldBal[0].Cmp(update.State.Balances[0][0]) != 0
@@ -142,9 +214,9 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 	// TODO: implement print balance with support for arbitrary number of participants
 	fmt.Printf("\n💭 New channel state proposed by %v:\n", alias)
 
-	fmt.Println(channelStateToString(update.State))
+	printStateDiff(ch.lastState, update.State)
 
-	fmt.Printf("❓ Enter \"accept\" to accept, \"reject\" to reject:\n")
+	fmt.Printf("❓ Enter \"accept\" to accept the new state, or \"reject\" to reject it:\n")
 
 	// TODO: use prompt for input once available in package
 	scanner := bufio.NewScanner(os.Stdin)
@@ -176,10 +248,11 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 		ch.lastState = update.State.Clone()
 
 	} else {
+		fmt.Println("❌ Channel update rejected")
+
 		if err := res.Reject(ctx, "update rejected by user"); err != nil {
 			ch.log.Error(errors.WithMessage(err, "rejecting update proposal"))
 		}
-		fmt.Println("❌ Channel update rejected")
 	}
 }
 
