@@ -23,13 +23,19 @@ var demoCmd = &cobra.Command{
 	Run: runDemo,
 }
 
-var testAPIFlag bool
-var cfgFile, cfgNetFile string
+// CommandLineFlags contains the command line flags.
+type CommandLineFlags struct {
+	testAPIEnabled bool
+	cfgFile        string
+	cfgNetFile     string
+}
+
+var flags CommandLineFlags
 
 func init() {
-	demoCmd.PersistentFlags().StringVar(&cfgFile, "config", "config.yaml", "General config file")
-	demoCmd.PersistentFlags().StringVar(&cfgNetFile, "network", "network.yaml", "Network config file")
-	demoCmd.PersistentFlags().BoolVar(&testAPIFlag, "test-api", false, "Expose testing API at 8080")
+	demoCmd.PersistentFlags().StringVar(&flags.cfgFile, "config", "config.yaml", "General config file")
+	demoCmd.PersistentFlags().StringVar(&flags.cfgNetFile, "network", "network.yaml", "Network config file")
+	demoCmd.PersistentFlags().BoolVar(&flags.testAPIEnabled, "test-api", false, "Expose testing API at 8080")
 	demoCmd.PersistentFlags().BoolVar(&GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
 	demoCmd.PersistentFlags().StringVar(&GetConfig().SecretKey, "sk", "", "ETH Secret Key")
 	viper.BindPFlag("secretkey", demoCmd.PersistentFlags().Lookup("sk"))
@@ -43,7 +49,7 @@ func GetDemoCmd() *cobra.Command {
 // runDemo is executed everytime the program is started with the `demo` sub-command.
 func runDemo(c *cobra.Command, args []string) {
 	Setup()
-	if testAPIFlag {
+	if flags.testAPIEnabled {
 		StartTestAPI()
 	}
 	p := prompt.New(
