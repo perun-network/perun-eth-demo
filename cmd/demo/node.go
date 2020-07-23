@@ -224,7 +224,8 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
 	// TODO: implement print balance with support for arbitrary number of participants
-	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\nEnter \"accept\" to accept, \"reject\" to reject.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+	fmt.Printf("❓ Enter \"accept\" to accept, \"reject\" to reject:\n")
 
 	// TODO: use prompt for input once available in package
 	scanner := bufio.NewScanner(os.Stdin)

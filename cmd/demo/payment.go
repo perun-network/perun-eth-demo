@@ -7,10 +7,12 @@ package demo
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
@@ -109,19 +111,40 @@ func stateBals(state *channel.State) []channel.Bal {
 	return state.Balances[0]
 }
 
+func channelStateToString(state *channel.State) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "ChannelID = %x\n", state.ID)
+	fmt.Fprintf(&b, "Version = %v\n", state.Version)
+	fmt.Fprintf(&b, "App = %v\n", state.App)
+	fmt.Fprintf(&b, "Assets = [")
+	for _, asset := range state.Assets {
+		var buf bytes.Buffer
+		asset.Encode(&buf)
+		fmt.Fprintf(&b, "%x, ", buf.Bytes())
+	}
+	fmt.Fprintf(&b, "]\n")
+	fmt.Fprintf(&b, "Balances = %v\n", state.Balances)
+	fmt.Fprintf(&b, "Data = %v\n", state.Data)
+
+	return b.String()
+}
+
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
 	oldBal := stateBals(ch.lastState)
 	balChanged := oldBal[0].Cmp(update.State.Balances[0][0]) != 0
 
-	actorAddress := ch.Peers()[update.ActorIdx]
+	actorAddress := ch.Peers()[0] // assuming two party channel
 	alias, _ := findConfig(actorAddress)
 	if alias == "" {
 		alias = fmt.Sprintf("%v", actorAddress)
 	}
 
 	// TODO: implement print balance with support for arbitrary number of participants
-	// TODO: allow access to human readable participants names from other
-	fmt.Printf("\n💭 Received channel update proposal from %v with balances %v Ξ.\nEnter \"accept\" to accept, \"reject\" to reject.\n", alias, weiToEther(update.State.Balances[0]...))
+	fmt.Printf("\n💭 New channel state proposed by %v:\n", alias)
+
+	fmt.Println(channelStateToString(update.State))
+
+	fmt.Printf("❓ Enter \"accept\" to accept, \"reject\" to reject:\n")
 
 	// TODO: use prompt for input once available in package
 	scanner := bufio.NewScanner(os.Stdin)
