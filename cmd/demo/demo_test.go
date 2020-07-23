@@ -5,7 +5,7 @@
 
 // +build on_chain_eth_test
 
-package cmd_test
+package demo_test
 
 import (
 	"fmt"
@@ -25,12 +25,12 @@ var (
 )
 
 func TestNodes(t *testing.T) {
-	alice, _, err := expect.Spawn("go run ../main.go demo --config ../alice.yaml --network ../network.yaml --log-level trace --test-api true --log-file alice.log", -1)
+	alice, _, err := expect.Spawn("go run ../../main.go demo --config ../../alice.yaml --network ../../network.yaml --log-level trace --test-api true --log-file alice.log", -1)
 	require.NoError(t, err)
 	defer alice.Close()
 	time.Sleep(time.Second * 2)
 
-	bob, _, err := expect.Spawn("go run ../main.go demo --config ../bob.yaml --network ../network.yaml --log-level trace --log-file bob.log", -1)
+	bob, _, err := expect.Spawn("go run ../../main.go demo --config ../../bob.yaml --network ../../network.yaml --log-level trace --log-file bob.log", -1)
 	require.NoError(t, err)
 	defer bob.Close()
 

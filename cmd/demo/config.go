@@ -70,6 +70,17 @@ func GetConfig() *Config {
 
 // SetConfig called by viper when the config file was parsed
 func SetConfig() {
+	// Load config files
+	viper.SetConfigFile(cfgFile)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file, %s", err)
+	}
+
+	viper.SetConfigFile(cfgNetFile)
+	if err := viper.MergeInConfig(); err != nil {
+		log.Fatalf("Error reading network config file, %s", err)
+	}
+
 	if err := viper.Unmarshal(&config); err != nil {
 		log.Fatal(err)
 	}

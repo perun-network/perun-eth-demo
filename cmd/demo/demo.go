@@ -3,12 +3,10 @@
 // perun-eth-demo. Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-package cmd
+package demo
 
 import (
 	"fmt"
-
-	demo "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 	prompt "github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
@@ -25,21 +23,28 @@ var demoCmd = &cobra.Command{
 	Run: runDemo,
 }
 
-var testAPI bool
+var testAPIFlag bool
+var cfgFile, cfgNetFile string
 
 func init() {
-	rootCmd.AddCommand(demoCmd)
-	demoCmd.PersistentFlags().BoolVar(&testAPI, "test-api", false, "Expose testing API at 8080")
-	demoCmd.PersistentFlags().BoolVar(&demo.GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
-	demoCmd.PersistentFlags().StringVar(&demo.GetConfig().SecretKey, "sk", "", "ETH Secret Key")
+	demoCmd.PersistentFlags().StringVar(&cfgFile, "config", "config.yaml", "General config file")
+	demoCmd.PersistentFlags().StringVar(&cfgNetFile, "network", "network.yaml", "Network config file")
+	demoCmd.PersistentFlags().BoolVar(&testAPIFlag, "test-api", false, "Expose testing API at 8080")
+	demoCmd.PersistentFlags().BoolVar(&GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
+	demoCmd.PersistentFlags().StringVar(&GetConfig().SecretKey, "sk", "", "ETH Secret Key")
 	viper.BindPFlag("secretkey", demoCmd.PersistentFlags().Lookup("sk"))
+}
+
+// GetDemoCmd exposes demoCmd so that it can be used as a sub-command by another cobra command instance.
+func GetDemoCmd() *cobra.Command {
+	return demoCmd
 }
 
 // runDemo is executed everytime the program is started with the `demo` sub-command.
 func runDemo(c *cobra.Command, args []string) {
-	demo.Setup()
-	if testAPI {
-		demo.StartTestAPI()
+	Setup()
+	if testAPIFlag {
+		StartTestAPI()
 	}
 	p := prompt.New(
 		executor,
@@ -56,7 +61,7 @@ func completer(prompt.Document) []prompt.Suggest {
 
 // executor wraps the demo executor to print error messages.
 func executor(in string) {
-	if err := demo.Executor(in); err != nil {
+	if err := Executor(in); err != nil {
 		fmt.Println("\033[0;33m⚡\033[0m", err)
 	}
 }
