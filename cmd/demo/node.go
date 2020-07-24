@@ -224,8 +224,8 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
 	// TODO: implement print balance with support for arbitrary number of participants
-	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
-	fmt.Printf("❓ Enter \"accept\" to accept, \"reject\" to reject:\n")
+	fmt.Printf("\n💭 Received channel proposal from %v to fund with initial balances %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+	fmt.Printf("❓ Enter \"accept\" to accept the channel proposal, or \"reject\" to reject it:\n")
 
 	// TODO: use prompt for input once available in package
 	scanner := bufio.NewScanner(os.Stdin)
@@ -234,22 +234,23 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 		return
 	}
 	userInput := scanner.Text()
+
 	if userInput == "accept" {
+		fmt.Println("✅ Channel proposal accepted")
+
 		if _, err := res.Accept(ctx, client.ProposalAcc{
 			Participant: n.offChain.Address(),
 		}); err != nil {
 			n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 			return
 		}
-
-		fmt.Println("✅ Channel proposal accepted")
 	} else {
+		fmt.Println("❌ Channel proposal rejected")
+
 		if err := res.Reject(ctx, "rejected by user"); err != nil {
 			n.log.Error(errors.WithMessage(err, "rejecting channel proposal"))
 			return
 		}
-
-		fmt.Println("❌ Channel proposal rejected")
 	}
 }
 
