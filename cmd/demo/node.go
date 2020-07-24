@@ -99,9 +99,14 @@ func (n *node) Connect(peerName string) error {
 		log:     log.WithField("peer", peerCfg.perunID),
 	}
 
-	fmt.Printf("📡 Connected to %v. Ready to open channel.\n", alias)
+	printf("📡 Connected to %v. Ready to open channel.\n", alias)
 
 	return nil
+}
+
+// printf prints to the console overwriting the command prefix and attaching a new one at the end
+func printf(format string, a ...interface{}) {
+	fmt.Printf("\r"+format+"> ", a...)
 }
 
 // peer returns the peer with the address `addr` or nil if not found.
@@ -136,7 +141,7 @@ func (n *node) setupChannel(ch *client.Channel) {
 	})
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("\n🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	printf("🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
@@ -223,13 +228,13 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
 	// TODO: implement print balance with support for arbitrary number of participants
-	fmt.Printf("\n💭 Received channel proposal from %v to fund with initial balances %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
-	fmt.Printf("❓ Enter \"accept\" to accept the channel proposal, or \"reject\" to reject it:\n")
+	printf("\n💭 Received channel proposal from %v to fund with initial balances %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+	printf("❓ Enter \"accept\" to accept the channel proposal, or \"reject\" to reject it:\n")
 
 	userInput := GetInput()
 
 	if userInput == "accept" {
-		fmt.Println("✅ Channel proposal accepted")
+		printf("✅ Channel proposal accepted\n")
 
 		if _, err := res.Accept(ctx, client.ProposalAcc{
 			Participant: n.offChain.Address(),
@@ -238,7 +243,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 			return
 		}
 	} else {
-		fmt.Println("❌ Channel proposal rejected")
+		printf("❌ Channel proposal rejected\n")
 
 		if err := res.Reject(ctx, "rejected by user"); err != nil {
 			n.log.Error(errors.WithMessage(err, "rejecting channel proposal"))
@@ -290,7 +295,7 @@ func (n *node) Open(peerName string, myBalEth *big.Float, peerBalEth *big.Float)
 	}
 
 	alias := peerName
-	fmt.Printf("💭 Proposing channel to %v...\n", alias)
+	printf("💭 Proposing channel to %v...\n", alias)
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()
@@ -353,7 +358,7 @@ func (n *node) settle(p *peer) error {
 	}
 	p.ch.log.Debug("Removing channel")
 	p.ch = nil
-	fmt.Printf("\n🏁 Settled channel with %s. Final Balance: [My: %v Ξ, Peer: %v Ξ]\n", p.alias, finalBals[0], finalBals[1])
+	printf("🏁 Settled channel with %s. Final Balance: [My: %v Ξ, Peer: %v Ξ]\n", p.alias, finalBals[0], finalBals[1])
 
 	return nil
 }

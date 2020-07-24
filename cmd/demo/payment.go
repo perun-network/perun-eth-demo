@@ -78,7 +78,7 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 	state.Version++
 	balChanged := state.Balances[0][0].Cmp(ch.State().Balances[0][0]) != 0
 
-	fmt.Printf("💭 Proposing update and waiting for confirmation...\n")
+	printf("💭 Proposing update and waiting for confirmation...\n")
 
 	err := ch.Update(ctx, client.ChannelUpdate{
 		State:    state,
@@ -196,7 +196,7 @@ func printStateDiff(oldState *channel.State, newState *channel.State) {
 		fmt.Fprintf(&b, "Data = %x -> Data = %x\n", oldState.Data, newState.Data)
 	}
 
-	fmt.Println(b.String())
+	printf(b.String() + "\n")
 }
 
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
@@ -210,11 +210,11 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 	}
 
 	// TODO: implement print balance with support for arbitrary number of participants
-	fmt.Printf("\n💭 New channel state proposed by %v:\n", alias)
+	printf("💭 New channel state proposed by %v:\n", alias)
 
 	printStateDiff(ch.lastState, update.State)
 
-	fmt.Printf("❓ Enter \"accept\" to accept the new state, or \"reject\" to reject it:\n")
+	printf("❓ Enter \"accept\" to accept the new state, or \"reject\" to reject it:\n")
 
 	userInput := GetInput()
 
@@ -223,7 +223,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 	if userInput == "accept" {
 
-		fmt.Println("✅ Channel update accepted")
+		printf("✅ Channel update accepted\n")
 
 		if err := res.Accept(ctx); err != nil {
 			ch.log.Error(errors.WithMessage(err, "handling payment update"))
@@ -231,7 +231,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 		if balChanged {
 			bals := weiToEther(update.State.Allocation.Balances[0]...)
-			fmt.Printf("\n💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+			printf("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 		}
 		if update.State.IsFinal {
 			ch.log.Trace("Calling onFinal handler for paymentChannel")
@@ -240,7 +240,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 		ch.lastState = update.State.Clone()
 
 	} else {
-		fmt.Println("❌ Channel update rejected")
+		printf("❌ Channel update rejected\n")
 
 		if err := res.Reject(ctx, "update rejected by user"); err != nil {
 			ch.log.Error(errors.WithMessage(err, "rejecting update proposal"))

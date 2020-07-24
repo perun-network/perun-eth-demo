@@ -110,7 +110,7 @@ func AddInput(in string) {
 		case in := <-cmdInput:
 
 			if err := Executor(in); err != nil {
-				fmt.Println("\033[0;33m⚡\033[0m", err)
+				printf("\033[0;33m⚡\033[0m %v\n", err)
 			}
 		default:
 		}
@@ -153,13 +153,17 @@ func Executor(in string) error {
 }
 
 func printHelp(args []string) error {
+	var b strings.Builder
+
 	for _, cmd := range commands {
-		fmt.Print(cmd.Name, " ")
+		fmt.Fprint(&b, cmd.Name, " ")
 		for _, arg := range cmd.Args {
-			fmt.Printf("<%s> ", arg.Name)
+			fmt.Fprintf(&b, "<%s> ", arg.Name)
 		}
-		fmt.Printf("\n\t%s\n\n", strings.ReplaceAll(cmd.Help, "\n", "\n\t"))
+		fmt.Fprintf(&b, "\n\t%s\n\n", strings.ReplaceAll(cmd.Help, "\n", "\n\t"))
 	}
+
+	printf(b.String())
 
 	return nil
 }
