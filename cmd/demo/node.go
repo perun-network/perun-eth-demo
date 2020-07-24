@@ -77,11 +77,11 @@ func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, er
 	return bals, nil
 }
 
-func (n *node) Connect(args []string) error {
+func (n *node) Connect(peerName string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	n.log.Traceln("Connecting...")
-	alias := args[0]
+	alias := peerName
 
 	if n.peers[alias] != nil {
 		return errors.New("Peer already connected")
@@ -259,15 +259,21 @@ func (n *node) handleFinal(p *peer) {
 	n.settle(p)
 }
 
-func (n *node) Open(args []string) error {
+func (n *node) Open(peerName string, myBalEth *big.Float, peerBalEth *big.Float) error {
+	peer := n.peers[peerName]
+	if peer == nil {
+		// try to connect to peer
+		if err := n.Connect(peerName); err != nil {
+			return err
+		}
+	}
+
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer := n.peers[args[0]]
+	peer = n.peers[peerName]
 	if peer == nil {
-		return errors.Errorf("peer not found %s", args[0])
+		return errors.Errorf("peer not found %s", peerName)
 	}
-	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
-	peerBalEth, _ := new(big.Float).SetString(args[2])
 
 	initBals := &channel.Allocation{
 		Assets:   []channel.Asset{n.asset},
@@ -283,7 +289,7 @@ func (n *node) Open(args []string) error {
 		PeerAddrs:         []wallet.Address{n.onChain.Address(), peer.perunID},
 	}
 
-	alias := args[0]
+	alias := peerName
 	fmt.Printf("💭 Proposing channel to %v...\n", alias)
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)

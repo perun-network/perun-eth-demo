@@ -7,6 +7,7 @@ package demo
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 
@@ -37,12 +38,23 @@ func init() {
 			"connect",
 			[]argument{{"Peer", valAlias}},
 			"Connect to a peer by their alias. The connection allows payment channels to be opened with the given peer.\nExample: connect bob",
-			func(args []string) error { return backend.Connect(args) },
+			func(args []string) error { return backend.Connect(args[0]) },
 		}, {
 			"open",
-			[]argument{{"Peer", valPeer}, {"Our Balance", valBal}, {"Their Balance", valBal}},
+			[]argument{{"Peer", valAlias}, {"Our Balance", valBal}, {"Their Balance", valBal}},
 			"Open a payment channel with the given peer and balances. The first value is the own balance and the second value is the peers balance. It is only possible to open one channel per peer.\nExample: open alice 10 10",
-			func(args []string) error { return backend.Open(args) },
+			func(args []string) error {
+				peerName := args[0]
+				myBalEth, b1 := new(big.Float).SetString(args[1])
+				if !b1 {
+					return errors.New(fmt.Sprintf("could not parse \"%v\"", args[1]))
+				}
+				peerBalEth, b2 := new(big.Float).SetString(args[2])
+				if !b2 {
+					return errors.New(fmt.Sprintf("could not parse \"%v\"", args[2]))
+				}
+				return backend.Open(peerName, myBalEth, peerBalEth)
+			},
 		}, {
 			"send",
 			[]argument{{"Peer", valPeer}, {"Amount", valBal}},
