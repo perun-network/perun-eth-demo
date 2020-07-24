@@ -203,8 +203,6 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
-	defer cancel()
 	id := req.PeerAddrs[0]
 	n.log.Debug("Received channel propsal")
 
@@ -214,6 +212,9 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 
 	if p == nil {
 		if cfg == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+			defer cancel()
+
 			res.Reject(ctx, "Unknown identity")
 			return
 		}
@@ -233,6 +234,8 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 
 	userInput := GetInput()
 
+	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+	defer cancel()
 	if userInput == "accept" {
 		printf("✅ Channel proposal accepted\n")
 
