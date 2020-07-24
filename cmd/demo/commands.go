@@ -27,8 +27,11 @@ type command struct {
 }
 
 var commands []command
+var cmdInput chan string
 
 func init() {
+	cmdInput = make(chan string, 1)
+
 	commands = []command{
 		{
 			"connect",
@@ -85,6 +88,28 @@ func init() {
 	}
 }
 
+// AddInput adds an input to the input command queue.
+func AddInput(in string) {
+	cmdInput <- in
+
+	// execute command asynchronously to enable prompts during commands
+	go func(cmdInput chan string) {
+		select {
+		case in := <-cmdInput:
+
+			if err := Executor(in); err != nil {
+				fmt.Println("\033[0;33m⚡\033[0m", err)
+			}
+		default:
+		}
+	}(cmdInput)
+}
+
+// GetInput returns the next command from the input queue.
+func GetInput() string {
+	return <-cmdInput
+}
+
 // Executor interprets commands entered by the user.
 // Gets called by Cobra, but could also be used for emulating user input.
 func Executor(in string) error {
@@ -111,6 +136,7 @@ func Executor(in string) error {
 			return cmd.Function(args)
 		}
 	}
+
 	return errors.Errorf("Unknown command: %s. Enter \"help\" for a list of commands.", command)
 }
 

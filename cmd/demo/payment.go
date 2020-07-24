@@ -6,12 +6,10 @@
 package demo
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"math/big"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -218,13 +216,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 	fmt.Printf("❓ Enter \"accept\" to accept the new state, or \"reject\" to reject it:\n")
 
-	// TODO: use prompt for input once available in package
-	scanner := bufio.NewScanner(os.Stdin)
-	if !scanner.Scan() {
-		ch.log.Error("reading user input")
-		return
-	}
-	userInput := scanner.Text()
+	userInput := GetInput()
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
 	defer cancel()
