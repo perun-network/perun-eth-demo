@@ -229,7 +229,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 
 	// TODO: implement print balance with support for arbitrary number of participants
 	printf("\n💭 Received channel proposal from %v to fund with initial balances %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
-	printf("❓ Enter \"accept\" to accept the channel proposal, or \"reject\" to reject it:\n")
+	printf("❓ Enter \"accept\" to accept the channel proposal, or anything else to reject it:\n")
 
 	userInput := GetInput()
 
@@ -295,7 +295,7 @@ func (n *node) Open(peerName string, myBalEth *big.Float, peerBalEth *big.Float)
 	}
 
 	alias := peerName
-	printf("💭 Proposing channel to %v...\n", alias)
+	fmt.Printf("\r💭 Proposing channel to %v and waiting for confirmation...\n", alias)
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()

@@ -78,7 +78,7 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 	state.Version++
 	balChanged := state.Balances[0][0].Cmp(ch.State().Balances[0][0]) != 0
 
-	printf("💭 Proposing update and waiting for confirmation...\n")
+	fmt.Printf("\r💭 Proposing channel update and waiting for confirmation...\n")
 
 	err := ch.Update(ctx, client.ChannelUpdate{
 		State:    state,
@@ -196,7 +196,7 @@ func printStateDiff(oldState *channel.State, newState *channel.State) {
 		fmt.Fprintf(&b, "Data = %x -> Data = %x\n", oldState.Data, newState.Data)
 	}
 
-	printf(b.String() + "\n")
+	printf(b.String())
 }
 
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
@@ -214,7 +214,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 	printStateDiff(ch.lastState, update.State)
 
-	printf("❓ Enter \"accept\" to accept the new state, or \"reject\" to reject it:\n")
+	printf("❓ Enter \"accept\" to accept the new state, or anything else to reject it:\n")
 
 	userInput := GetInput()
 
