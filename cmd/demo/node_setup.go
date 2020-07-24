@@ -60,12 +60,12 @@ func newNode() (*node, error) {
 	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
 
 	n := &node{
-		log:     log.Get(),
-		onChain: acc,
-		wallet:  wallet,
-		dialer:  dialer,
-		cb:      echannel.NewContractBackend(ethereumBackend, wallet.Ks, &acc.Account),
-		peers:   make(map[string]*peer),
+		log:            log.Get(),
+		onChain:        acc,
+		wallet:         wallet,
+		dialer:         dialer,
+		cb:             echannel.NewContractBackend(ethereumBackend, wallet.Ks, &acc.Account),
+		connectedPeers: make(map[string]*peer),
 	}
 	return n, n.setup()
 }

@@ -52,7 +52,7 @@ func (r *run) String() string {
 func (n *node) Benchmark(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer := n.peers[args[0]]
+	peer := n.connectedPeers[args[0]]
 	x, _ := strconv.Atoi(args[1])
 	var r run
 

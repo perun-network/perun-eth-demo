@@ -61,8 +61,8 @@ type node struct {
 	cb echannel.ContractBackend
 
 	// Protects peers
-	mtx   sync.Mutex
-	peers map[string]*peer
+	mtx            sync.Mutex
+	connectedPeers map[string]*peer
 }
 
 func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, error) {
@@ -83,7 +83,7 @@ func (n *node) Connect(peerName string) error {
 	n.log.Traceln("Connecting...")
 	alias := peerName
 
-	if n.peers[alias] != nil {
+	if n.connectedPeers[alias] != nil {
 		return errors.New("Peer already connected")
 	}
 	peerCfg, ok := config.Peers[alias]
@@ -93,7 +93,7 @@ func (n *node) Connect(peerName string) error {
 
 	n.dialer.Register(peerCfg.perunID, peerCfg.Hostname+":"+strconv.Itoa(int(peerCfg.Port)))
 
-	n.peers[alias] = &peer{
+	n.connectedPeers[alias] = &peer{
 		alias:   alias,
 		perunID: peerCfg.perunID,
 		log:     log.WithField("peer", peerCfg.perunID),
@@ -106,7 +106,7 @@ func (n *node) Connect(peerName string) error {
 
 // peer returns the peer with the address `addr` or nil if not found.
 func (n *node) peer(addr wire.Address) *peer {
-	for _, peer := range n.peers {
+	for _, peer := range n.connectedPeers {
 		if peer.perunID.Equals(addr) {
 			return peer
 		}
@@ -149,7 +149,7 @@ func (n *node) GetBals() map[string]balTuple {
 	defer n.mtx.Unlock()
 
 	bals := make(map[string]balTuple)
-	for alias, peer := range n.peers {
+	for alias, peer := range n.connectedPeers {
 		if peer.ch != nil {
 			my, other := peer.ch.GetBalances()
 			bals[alias] = balTuple{my, other}
@@ -182,7 +182,7 @@ func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResp
 }
 
 func (n *node) channel(id channel.ID) *paymentChannel {
-	for _, p := range n.peers {
+	for _, p := range n.connectedPeers {
 		if p.ch != nil && p.ch.ID() == id {
 			return p.ch
 		}
@@ -217,7 +217,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 			perunID: id,
 			log:     log.WithField("peer", id),
 		}
-		n.peers[alias] = p
+		n.connectedPeers[alias] = p
 		n.log.WithField("channel", id).WithField("alias", alias).Debug("New peer")
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
@@ -260,7 +260,7 @@ func (n *node) handleFinal(p *peer) {
 }
 
 func (n *node) Open(peerName string, myBalEth *big.Float, peerBalEth *big.Float) error {
-	peer := n.peers[peerName]
+	peer := n.connectedPeers[peerName]
 	if peer == nil {
 		// try to connect to peer
 		if err := n.Connect(peerName); err != nil {
@@ -270,7 +270,7 @@ func (n *node) Open(peerName string, myBalEth *big.Float, peerBalEth *big.Float)
 
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer = n.peers[peerName]
+	peer = n.connectedPeers[peerName]
 	if peer == nil {
 		return errors.Errorf("peer not found %s", peerName)
 	}
@@ -311,7 +311,7 @@ func (n *node) Send(args []string) error {
 	defer n.mtx.Unlock()
 	n.log.Traceln("Sending...")
 
-	peer := n.peers[args[0]]
+	peer := n.connectedPeers[args[0]]
 	if peer == nil {
 		return errors.Errorf("peer not found %s", args[0])
 	} else if peer.ch == nil {
@@ -328,7 +328,7 @@ func (n *node) Close(args []string) error {
 	n.log.Traceln("Closing...")
 
 	alias := args[0]
-	peer := n.peers[alias]
+	peer := n.connectedPeers[alias]
 	if peer == nil {
 		return errors.Errorf("Unknown peer: %s", alias)
 	}
@@ -368,7 +368,7 @@ func (n *node) Info(args []string) error {
 	defer cancel()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
 	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy Ξ\tPeer Ξ\tMy On-Chain Ξ\tPeer On-Chain Ξ\t\n")
-	for alias, peer := range n.peers {
+	for alias, peer := range n.connectedPeers {
 		onChainBals, err := getOnChainBal(ctx, n.onChain.Address(), peer.perunID)
 		if err != nil {
 			return err
@@ -400,5 +400,5 @@ func (n *node) ExistsPeer(alias string) bool {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 
-	return n.peers[alias] != nil
+	return n.connectedPeers[alias] != nil
 }
