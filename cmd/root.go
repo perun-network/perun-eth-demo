@@ -24,8 +24,6 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: runRoot,
 }
 
-var cfgFile, cfgNetFile string
-
 func init() {
 	rootCmd.PersistentFlags().StringVar(&logConfig.Level, "log-level", "warn", "Logrus level")
 	viper.BindPFlag("log.level", rootCmd.PersistentFlags().Lookup("log-level"))
