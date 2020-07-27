@@ -1,10 +1,6 @@
 name: Testing
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: push
 
 jobs:
 
@@ -71,3 +67,8 @@ jobs:
 
     - name: Race Test
       run: go test -timeout 120s -race -gcflags=all=-d=checkptr=0 ./...
+
+    - name: Command Tests
+      run: |
+        go build .
+        ./perun-eth-demo help
