@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	perun "perun.network/go-perun/peer"
+	"perun.network/go-perun/wire"
 )
 
 // Config contains all configuration read from config.yaml and network.yaml
@@ -54,7 +54,7 @@ type chainConfig struct {
 
 type netConfigEntry struct {
 	PerunID  string
-	perunID  perun.Address
+	perunID  wire.Address
 	Lel      string
 	Hostname string
 	Port     uint16
