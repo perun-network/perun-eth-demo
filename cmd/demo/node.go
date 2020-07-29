@@ -25,14 +25,15 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
-	perunpeer "perun.network/go-perun/peer"
-	"perun.network/go-perun/peer/net"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire"
+	wirenet "perun.network/go-perun/wire/net"
+	"perun.network/go-perun/wire/net/simple"
 )
 
 type peer struct {
 	alias   string
-	perunID perunpeer.Address
+	perunID wire.Address
 	ch      *paymentChannel
 	log     log.Logger
 }
@@ -40,8 +41,9 @@ type peer struct {
 type node struct {
 	log log.Logger
 
+	bus    *wirenet.Bus
 	client *client.Client
-	dialer *net.Dialer
+	dialer *simple.Dialer
 
 	// Account for signing on-chain TX. Currently also the Perun-ID.
 	onChain wallet.Account
@@ -90,11 +92,7 @@ func (n *node) Connect(args []string) error {
 	}
 
 	n.dialer.Register(peerCfg.perunID, peerCfg.Hostname+":"+strconv.Itoa(int(peerCfg.Port)))
-	ctx, cancel := context.WithTimeout(context.Background(), config.Node.DialTimeout)
-	defer cancel()
-	if _, err := n.dialer.Dial(ctx, peerCfg.perunID); err != nil {
-		return errors.WithMessage(err, "could not connect to peer")
-	}
+
 	n.peers[alias] = &peer{
 		alias:   alias,
 		perunID: peerCfg.perunID,
@@ -105,7 +103,7 @@ func (n *node) Connect(args []string) error {
 }
 
 // peer returns the peer with the address `addr` or nil if not found.
-func (n *node) peer(addr perunpeer.Address) *peer {
+func (n *node) peer(addr wire.Address) *peer {
 	for _, peer := range n.peers {
 		if peer.perunID.Equals(addr) {
 			return peer
@@ -115,7 +113,11 @@ func (n *node) peer(addr perunpeer.Address) *peer {
 }
 
 func (n *node) setupChannel(ch *client.Channel) {
-	perunID := ch.Peers()[0]
+	if len(ch.Peers()) != 2 {
+		log.Fatal("Only channels with two participants are currently supported")
+	}
+
+	perunID := ch.Peers()[1-ch.Idx()] // assumes two-party channel
 	p := n.peer(perunID)
 
 	if p == nil {
@@ -133,7 +135,7 @@ func (n *node) setupChannel(ch *client.Channel) {
 
 	bals := weiToEther(ch.State().Balances[0]...)
 	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
-		p.alias, bals[ch.Idx()], bals[1-ch.Idx()])
+		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
 type balTuple struct {
@@ -187,6 +189,10 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 }
 
 func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalResponder) {
+	if len(req.PeerAddrs) != 2 {
+		log.Fatal("Only channels with two participants are currently supported")
+	}
+
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)

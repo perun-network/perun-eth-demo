@@ -8,7 +8,6 @@ package demo
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
 	"strconv"
 	"text/tabwriter"
@@ -26,9 +25,9 @@ import (
 	"perun.network/go-perun/channel/persistence/keyvalue"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
-	"perun.network/go-perun/peer/net"
 	"perun.network/go-perun/pkg/sortedkv/leveldb"
-	wtest "perun.network/go-perun/wallet/test"
+	wirenet "perun.network/go-perun/wire/net"
+	"perun.network/go-perun/wire/net/simple"
 )
 
 var (
@@ -40,8 +39,8 @@ var (
 // configuration from viper.
 func Setup() {
 	SetConfig()
-	rng := rand.New(rand.NewSource(0x280a0f350eec))
-	appDef := wtest.NewRandomAddress(rng)
+
+	appDef := &ewallet.Address{} // dummy app def
 	payment.SetAppDef(appDef)
 
 	var err error
@@ -58,7 +57,7 @@ func newNode() (*node, error) {
 	if err != nil {
 		return nil, errors.WithMessage(err, "importing secret key")
 	}
-	dialer := net.NewTCPDialer(config.Node.DialTimeout)
+	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
 
 	n := &node{
 		log:     log.Get(),
@@ -85,10 +84,17 @@ func (n *node) setup() error {
 
 	n.offChain = n.wallet.NewAccount()
 	n.log.WithField("off-chain", n.offChain.Address()).Info("Generating account")
-	n.client = client.New(n.onChain, n.dialer, n.funder, n.adjudicator, n.wallet)
+
+	n.bus = wirenet.NewBus(n.onChain, n.dialer)
+
+	var err error
+	if n.client, err = client.New(n.onChain.Address(), n.bus, n.funder, n.adjudicator, n.wallet); err != nil {
+		return errors.WithMessage(err, "creating client")
+	}
+
 	host := config.Node.IP + ":" + strconv.Itoa(int(config.Node.Port))
 	n.log.WithField("host", host).Trace("Listening for connections")
-	listener, err := net.NewTCPListener(host)
+	listener, err := simple.NewTCPListener(host)
 	if err != nil {
 		return errors.WithMessage(err, "could not start tcp listener")
 	}
@@ -98,7 +104,7 @@ func (n *node) setup() error {
 		return errors.WithMessage(err, "setting up persistence")
 	}
 	go n.client.Handle(n, n)
-	go n.client.Listen(listener)
+	go n.bus.Listen(listener)
 	n.PrintConfig()
 	return nil
 }
@@ -169,16 +175,13 @@ func (n *node) setupPersistence() error {
 		if err != nil {
 			return errors.WithMessage(err, "creating/loading database")
 		}
-		persister, err := keyvalue.NewPersistRestorer(db)
-		if err != nil {
-			return errors.WithMessage(err, "creating PersistRestorer")
-		}
+		persister := keyvalue.NewPersistRestorer(db)
 		n.client.EnablePersistence(persister)
 
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.ReconnecTimeout)
 		defer cancel()
-		if err := n.client.Reconnect(ctx); err != nil {
-			n.log.WithError(err).Warn("Could not reconnect to all peers")
+		if err := n.client.Restore(ctx); err != nil {
+			n.log.WithError(err).Warn("Could not restore client")
 			// return the error.
 		}
 	} else {
