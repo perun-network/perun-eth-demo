@@ -18,6 +18,7 @@ node:
 
 chain:
   url: ws://127.0.0.1:8545
+  contractsetup: validate
   adjudicator: 0xDc4A7e107aD6dBDA1870df34d70B51796BBd1335
   assetholder: 0xb051EAD0C6CC2f568166F8fEC4f07511B88678bA
   txTimeout: 30s

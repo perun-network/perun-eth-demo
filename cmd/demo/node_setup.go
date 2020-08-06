@@ -109,63 +109,50 @@ func (n *node) setup() error {
 	return nil
 }
 
-// setupContracts reads from the config file whether the node should deploy or use
-// existing contract addresses.
-func (n *node) setupContracts() (err error) {
-	var adjAddr, assAddr common.Address
+func (n *node) setupContracts() error {
+	var adjAddr common.Address
+	var assAddr common.Address
+	var err error
 
-	if config.Chain.Adjudicator == "deploy" {
-		adjAddr, err = deployAdjudicator(n.cb)
-		if err != nil {
-			return
+	switch contractSetup := config.Chain.contractSetup; contractSetup {
+	case contractSetupOptionValidate:
+		if adjAddr, err = validateAdjudicator(n.cb); err == nil { // validate adjudicator
+			assAddr, err = validateAssetHolder(n.cb, adjAddr) // validate asset holder
 		}
-		fmt.Println("💭 Adjudicator contract deployed")
-	} else {
-		tmpAdj, err := strToAddress(config.Chain.Adjudicator)
-		if err != nil {
-			return err
+	case contractSetupOptionDeploy:
+		if adjAddr, err = deployAdjudicator(n.cb); err == nil { // deploy adjudicator
+			assAddr, err = deployAssetHolder(n.cb, adjAddr) // deploy asset holder
 		}
-		adjAddr = ewallet.AsEthAddr(tmpAdj)
-
-		ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
-		defer cancel()
-		if err := echannel.ValidateAdjudicator(ctx, n.cb, adjAddr); err != nil {
-			return errors.WithMessage(err, "validating adjudicator contract")
+	case contractSetupOptionValidateOrDeploy:
+		if adjAddr, err = validateAdjudicator(n.cb); err != nil { // validate adjudicator
+			fmt.Println("❌ Adjudicator invalid")
+			adjAddr, err = deployAdjudicator(n.cb) // deploy adjudicator
 		}
 
-		fmt.Println("💭 Adjudicator contract validated")
+		if err == nil {
+			if assAddr, err = validateAssetHolder(n.cb, adjAddr); err != nil { // validate asset holder
+				fmt.Println("❌ Asset holder invalid")
+				assAddr, err = deployAssetHolder(n.cb, adjAddr) // deploy asset holder
+			}
+		}
+	default:
+		// unsupported setup method
+		err = errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
 	}
 
-	if config.Chain.Assetholder == "deploy" {
-		assAddr, err = deployAsset(n.cb, adjAddr)
-		if err != nil {
-			return
-		}
-		fmt.Println("💭 Asset holder contract deployed")
-	} else {
-		tmpAsset, err := strToAddress(config.Chain.Assetholder)
-		if err != nil {
-			return err
-		}
-		assAddr = ewallet.AsEthAddr(tmpAsset)
-
-		ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
-		defer cancel()
-		if err := echannel.ValidateAssetHolderETH(ctx, n.cb, assAddr, adjAddr); err != nil {
-			return errors.WithMessage(err, "validating asset holder contract")
-		}
-
-		fmt.Println("💭 Asset holder contract validated")
+	if err != nil {
+		return errors.WithMessage(err, "contract setup failed")
 	}
+
 	n.adjAddr = adjAddr
 	n.assetAddr = assAddr
-
 	recvAddr := ewallet.AsEthAddr(n.onChain.Address())
-	n.adjudicator = echannel.NewAdjudicator(n.cb, adjAddr, recvAddr)
-	n.funder = echannel.NewETHFunder(n.cb, assAddr)
-	n.asset = (*ewallet.Address)(&assAddr)
-	n.log.WithField("Adj", adjAddr).WithField("Asset", assAddr).Debug("Set contracts")
-	return
+	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, recvAddr)
+	n.funder = echannel.NewETHFunder(n.cb, n.assetAddr)
+	n.asset = (*ewallet.Address)(&n.assetAddr)
+	n.log.WithField("Adj", n.adjAddr).WithField("Asset", n.assetAddr).Debug("Set contracts")
+
+	return nil
 }
 
 func (n *node) setupPersistence() error {
@@ -190,18 +177,40 @@ func (n *node) setupPersistence() error {
 	return nil
 }
 
+func validateAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
+	fmt.Println("🌐 Validate adjudicator")
+
+	ctx, cancel := newTransactionContext()
+	defer cancel()
+
+	adjAddr := config.Chain.adjudicator
+	return adjAddr, echannel.ValidateAdjudicator(ctx, cb, adjAddr)
+}
+
+func validateAssetHolder(cb echannel.ContractBackend, adjAddr common.Address) (common.Address, error) {
+	fmt.Println("🌐 Validate asset holder")
+
+	ctx, cancel := newTransactionContext()
+	defer cancel()
+
+	assAddr := config.Chain.assetholder
+	return assAddr, echannel.ValidateAssetHolderETH(ctx, cb, assAddr, adjAddr)
+}
+
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
 // or an error.
 func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
+	fmt.Println("🌐 Deploy adjudicator")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	adjAddr, err := echannel.DeployAdjudicator(ctx, cb)
 	return adjAddr, errors.WithMessage(err, "deploying eth adjudicator")
 }
 
-// deployAsset deploys the Assetholder to the blockchain and returns its address
+// deployAssetHolder deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
-func deployAsset(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
+func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
+	fmt.Println("🌐 Deploy asset holder")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator)
@@ -232,6 +241,10 @@ func importAccount(secret string) (*ewallet.Wallet, *ewallet.Account, error) {
 	wAcc := ewallet.NewAccountFromEth(wallet, &ethAcc)
 	acc, err := wallet.Unlock(wAcc.Address())
 	return wallet, acc.(*ewallet.Account), err
+}
+
+func newTransactionContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 }
 
 func (n *node) PrintConfig() error {
