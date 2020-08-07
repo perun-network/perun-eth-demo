@@ -88,7 +88,7 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) e
 
 	if balChanged {
 		bals := weiToEther(state.Allocation.Balances[0]...)
-		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+		printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 	}
 	if err == nil {
 		ch.lastState = state
