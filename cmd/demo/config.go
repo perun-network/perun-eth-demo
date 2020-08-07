@@ -26,8 +26,7 @@ type Config struct {
 	Channel    channelConfig
 	Node       nodeConfig
 	Chain      chainConfig
-	// Read from the network.yaml. The key is the alias.
-	Peers map[string]*netConfigEntry
+	Peers      map[string]*netConfigEntry // Read from the network.yaml. The key is the alias.
 }
 
 type channelConfig struct {
