@@ -19,7 +19,7 @@ The authors take no responsibility for any loss of digital assets or other damag
 
 ## Getting Started
 
-Running _perun-eth-demo_ requires a working Go distribution (version 1.14 or higher). Optionally, [ganache-cli](https://github.com/trufflesuite/ganache-cli) needs to be installed for following the walkthrough. _perun-eth-demo_ works with any ethereum node.
+Running _perun-eth-demo_ requires [Go 1.15](https://golang.org) or higher. To follow the walkthrough we recommend to also install [ganache-cli](https://github.com/trufflesuite/ganache-cli), but _perun-eth-demo_ works with any ethereum node.
 ```sh
 # Clone the repository into a directory of your choice
 git clone https://github.com/perun-network/perun-eth-demo
@@ -32,7 +32,7 @@ go build
 
 ## Demo
 
-The currently only sub-command is `demo`, which starts the CLI node. The node's
+Currently, the only available sub-command of _perun-eth-demo_ is `demo`, which starts the CLI node. The node's
 configuration file can be chosen with the `--config` flag. Two sample
 configurations `alice.yaml` and `bob.yaml` are provided. A default network
 configuration for Alice and Bob is provided in file `network.yaml`.

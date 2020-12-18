@@ -9,12 +9,14 @@ import (
 	"bytes"
 	srand "crypto/rand"
 	"encoding/hex"
+	"io"
 	"math/big"
 	"net"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
+	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
 	"perun.network/go-perun/wallet"
 )
@@ -84,15 +86,11 @@ func strToAddress(str string) (wallet.Address, error) {
 }
 
 // nonce generates a cryptographically secure random value in the range [0, 2^256 -1]
-func nonce() *big.Int {
-	max := new(big.Int)
-	max.Exp(big.NewInt(2), big.NewInt(256), nil).Sub(max, big.NewInt(1))
-
-	val, err := srand.Int(srand.Reader, max)
-	if err != nil {
-		log.Panic("Could not create nonce")
+func nonce() (share client.NonceShare) {
+	if _, err := io.ReadFull(srand.Reader, share[:]); err != nil {
+		log.Panic("Failed to read nonce share", err)
 	}
-	return val
+	return
 }
 
 // etherToWei converts amount in "ether" (represented as float) to "wei" (represented as integer).

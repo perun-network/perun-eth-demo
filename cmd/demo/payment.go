@@ -36,12 +36,6 @@ type (
 )
 
 func newPaymentChannel(ch *client.Channel, onFinal func()) *paymentChannel {
-	go func() {
-		l := log.WithField("channel", ch.ID())
-		l.Debug("Watcher started")
-		err := ch.Watch()
-		l.WithError(err).Debug("Watcher stopped")
-	}()
 	return &paymentChannel{
 		Channel:   ch,
 		log:       log.WithField("channel", ch.ID()),
@@ -53,34 +47,31 @@ func newPaymentChannel(ch *client.Channel, onFinal func()) *paymentChannel {
 }
 func (ch *paymentChannel) sendMoney(amount *big.Int) error {
 	return ch.sendUpdate(
-		func(state *channel.State) {
+		func(state *channel.State) error {
 			transferBal(stateBals(state), ch.Idx(), amount)
+			return nil
 		}, "sendMoney")
 }
 
 func (ch *paymentChannel) sendFinal() error {
 	ch.log.Debugf("Sending final state")
-	return ch.sendUpdate(func(state *channel.State) {
+	return ch.sendUpdate(func(state *channel.State) error {
 		state.IsFinal = true
+		return nil
 	}, "final")
 }
 
-func (ch *paymentChannel) sendUpdate(update func(*channel.State), desc string) error {
+func (ch *paymentChannel) sendUpdate(update func(*channel.State) error, desc string) error {
 	ch.log.Debugf("Sending update: %s", desc)
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
 	defer cancel()
 
-	state := ch.State().Clone()
-	update(state)
-	state.Version++
-	balChanged := state.Balances[0][0].Cmp(ch.State().Balances[0][0]) != 0
-
-	err := ch.Update(ctx, client.ChannelUpdate{
-		State:    state,
-		ActorIdx: ch.Idx(),
-	})
+	stateBefore := ch.State()
+	err := ch.UpdateBy(ctx, update)
 	ch.log.Debugf("Sent update: %s, err: %v", desc, err)
 
+	state := ch.State()
+	balChanged := stateBefore.Balances[0][0].Cmp(state.Balances[0][0]) != 0
 	if balChanged {
 		bals := weiToEther(state.Allocation.Balances[0]...)
 		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel

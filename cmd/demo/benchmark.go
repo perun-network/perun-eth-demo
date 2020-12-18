@@ -66,7 +66,7 @@ func (n *node) Benchmark(args []string) error {
 
 	for i := 0; i < x; i++ {
 		r.Start()
-		if err := peer.ch.sendUpdate(func(*channel.State) {}, "benchmark"); err != nil {
+		if err := peer.ch.sendUpdate(func(*channel.State) error { return nil }, "benchmark"); err != nil {
 			return errors.WithMessage(err, "could not send update")
 		}
 		r.Stop()

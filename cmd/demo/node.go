@@ -13,15 +13,14 @@ import (
 	"strconv"
 	"sync"
 	"text/tabwriter"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"perun.network/go-perun/apps/payment"
 	_ "perun.network/go-perun/backend/ethereum" // backend init
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
+	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -46,11 +45,11 @@ type node struct {
 	dialer *simple.Dialer
 
 	// Account for signing on-chain TX. Currently also the Perun-ID.
-	onChain wallet.Account
+	onChain *pkeystore.Account
 	// Account for signing off-chain TX. Currently one Account for all
 	// state channels, later one we want one Account per Channel.
 	offChain wallet.Account
-	wallet   *ewallet.Wallet
+	wallet   *pkeystore.Wallet
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
@@ -112,6 +111,11 @@ func (n *node) peer(addr wire.Address) *peer {
 	return nil
 }
 
+func (n *node) channelPeer(ch *client.Channel) *peer {
+	perunID := ch.Peers()[1-ch.Idx()] // assumes two-party channel
+	return n.peer(perunID)
+}
+
 func (n *node) setupChannel(ch *client.Channel) {
 	if len(ch.Peers()) != 2 {
 		log.Fatal("Only channels with two participants are currently supported")
@@ -128,14 +132,42 @@ func (n *node) setupChannel(ch *client.Channel) {
 		return
 	}
 
-	// This also starts the watcher.
 	p.ch = newPaymentChannel(ch, func() {
 		n.handleFinal(p)
 	})
 
+	// Start watching.
+	go func() {
+		l := log.WithField("channel", ch.ID())
+		l.Debug("Watcher started")
+		err := ch.Watch(n)
+		l.WithError(err).Debug("Watcher stopped")
+	}()
+
 	bals := weiToEther(ch.State().Balances[0]...)
 	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+}
+
+func (n *node) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+	fmt.Printf("\n🎭 On-chain event: %v\n", e)
+
+	if _, ok := e.(*channel.ConcludedEvent); ok {
+		fmt.Printf("\n🎭 Concluded event\n")
+		func() {
+			n.mtx.Lock()
+			defer n.mtx.Unlock()
+			ch := n.channel(e.ID())
+			if ch == nil {
+				// If we initiated the channel closing, then the channel should
+				// already be removed and we return.
+				return
+			}
+			if err := n.settle(n.channelPeer(ch.Channel)); err != nil {
+				fmt.Printf("\n🎭 error while settling: %v\n", err)
+			}
+		}()
+	}
 }
 
 type balTuple struct {
@@ -188,8 +220,13 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 	return nil
 }
 
-func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalResponder) {
-	if len(req.PeerAddrs) != 2 {
+func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalResponder) {
+	req, ok := prop.(*client.LedgerChannelProposal)
+	if !ok {
+		log.Fatal("Can handle only ledger channel proposals.")
+	}
+
+	if len(req.Peers) != 2 {
 		log.Fatal("Only channels with two participants are currently supported")
 	}
 
@@ -197,7 +234,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	defer n.mtx.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 	defer cancel()
-	id := req.PeerAddrs[0]
+	id := req.Peers[0]
 	n.log.Debug("Received channel propsal")
 
 	// Find the peer by its perunID and create it if not present
@@ -219,9 +256,8 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
-	if _, err := res.Accept(ctx, client.ProposalAcc{
-		Participant: n.offChain.Address(),
-	}); err != nil {
+	a := req.Accept(n.offChain.Address(), client.WithNonce(nonce()))
+	if _, err := res.Accept(ctx, a); err != nil {
 		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 		return
 	}
@@ -230,13 +266,7 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 // handleFinal is called when the channel with peer `p` received a final update,
 // indicating closure.
 func (n *node) handleFinal(p *peer) {
-	// Without on-chain watchers we just wait one second before try to settle.
-	// Otherwise out settling could collide with the other party's.
-	// Needs to be increased for geth-nodes but works for ganache.
-	time.Sleep(time.Second)
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
-	n.settle(p)
+	// Nothing to do here. Channel closing is handled in on-chain event handler.
 }
 
 func (n *node) Open(args []string) error {
@@ -253,14 +283,17 @@ func (n *node) Open(args []string) error {
 		Assets:   []channel.Asset{n.asset},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
-	prop := &client.ChannelProposal{
-		ChallengeDuration: config.Channel.ChallengeDurationSec,
-		Nonce:             nonce(),
-		ParticipantAddr:   n.offChain.Address(),
-		AppDef:            payment.AppDef(),
-		InitData:          new(payment.NoData),
-		InitBals:          initBals,
-		PeerAddrs:         []wallet.Address{n.onChain.Address(), peer.perunID},
+
+	prop, err := client.NewLedgerChannelProposal(
+		config.Channel.ChallengeDurationSec,
+		n.offChain.Address(),
+		initBals,
+		[]wire.Address{n.onChain.Address(), peer.perunID},
+		client.WithNonce(nonce()),
+		client.WithApp(app, appData),
+	)
+	if err != nil {
+		return errors.WithMessage(err, "creating channel proposal")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
@@ -312,11 +345,15 @@ func (n *node) settle(p *peer) error {
 	p.ch.log.Debug("Settling")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
-	finalBals := weiToEther(p.ch.GetBalances())
-	if err := p.ch.Settle(ctx); err != nil {
+
+	if err := p.ch.Register(ctx); err != nil {
+		return errors.WithMessage(err, "registering")
+	}
+	if err := p.ch.Settle(ctx, p.ch.Idx() == 0); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}
 
+	finalBals := weiToEther(p.ch.GetBalances())
 	if err := p.ch.Close(); err != nil {
 		return errors.WithMessage(err, "channel closing")
 	}
