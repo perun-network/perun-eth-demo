@@ -107,7 +107,10 @@ func Executor(in string) error {
 			return cmd.Function(args)
 		}
 	}
-	return errors.Errorf("Unknown command: %s", command)
+	if command != "" {
+		return errors.Errorf("Unknown command: %s", command)
+	}
+	return nil
 }
 
 func printHelp(args []string) error {
