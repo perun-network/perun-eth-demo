@@ -58,7 +58,7 @@ func init() {
 		}, {
 			"info",
 			nil,
-			"Print the current open state channels.",
+			"Print information about funds, peers, and channels.",
 			func(args []string) error { return backend.Info(args) },
 		}, {
 			"benchmark",
