@@ -81,10 +81,9 @@ You may always check the current status with command `info`.
 
 You can also run a performance benchmark with command
 ```
-> benchmark alice 1000
+> benchmark alice 10 100
 ```
-which will benchmark 1000 transactions without updating the payment channel
-balances. The results will be printed in a table.
+which will send 10 ETH in 100 micro-transactions from Bob to Alice. Transaction performance will be printed in a table.
 
 Finally, you can settle the channel on either side with
 ```
