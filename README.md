@@ -57,11 +57,8 @@ Bob validates the contracts at startup and quits if the contracts have not been 
 You can see two transactions in the ganache terminal corresponding to the
 deployment of the `AssetHolder` and `Adjudicator` contracts.
 
-Once both CLIs are running, e.g. in Alice's terminal, connect to bob with
-```
-> connect bob
-```
-Then propose a payment channel with 100 ETH deposit from both sides with
+Once both CLIs are running, e.g. in Alice's terminal, propose a payment channel
+to Bob with 100 ETH deposit from both sides via the following command.
 ```
 > open bob 100 100
 ```

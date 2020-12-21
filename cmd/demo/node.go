@@ -79,9 +79,11 @@ func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, er
 func (n *node) Connect(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	n.log.Traceln("Connecting...")
-	alias := args[0]
+	return n.connect(args[0])
+}
 
+func (n *node) connect(alias string) error {
+	n.log.Traceln("Connecting...")
 	if n.peers[alias] != nil {
 		return errors.New("Peer already connected")
 	}
@@ -286,9 +288,14 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 func (n *node) Open(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer := n.peers[args[0]]
+	peerName := args[0]
+	peer := n.peers[peerName]
 	if peer == nil {
-		return errors.Errorf("peer not found %s", args[0])
+		// try to connect to peer
+		if err := n.connect(peerName); err != nil {
+			return err
+		}
+		peer = n.peers[peerName]
 	}
 	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
 	peerBalEth, _ := new(big.Float).SetString(args[2])
