@@ -65,8 +65,8 @@ func init() {
 			func(args []string) error { return backend.Info(args) },
 		}, {
 			"benchmark",
-			[]argument{{"Peer", valPeer}, {"n", valUInt}},
-			"Performs a benchmark with the given peer by updating a state channel n times.Must have an open channel with the peer.",
+			[]argument{{"Peer", valPeer}, {"amount", valUInt}, {"txCount", valUInt}},
+			"Performs a benchmark with the given peer by sending amount ETH in txCount micro transactions. Must have an open channel with the peer.",
 			func(args []string) error { return backend.Benchmark(args) },
 		}, {
 			"help",
