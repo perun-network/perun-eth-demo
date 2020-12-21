@@ -7,13 +7,12 @@ package demo_test
 
 import (
 	"fmt"
-	"net"
+	"io"
+	"os/exec"
 	"regexp"
 	"testing"
 	"time"
 
-	expect "github.com/google/goexpect"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,70 +21,65 @@ var (
 	timeout = time.Second * 30
 )
 
+type Cmd struct {
+	*exec.Cmd
+	stdin io.WriteCloser
+}
+
+func nodeCmd(name string) (*Cmd, error) {
+	args := []string{
+		"run", "../../main.go",
+		"demo",
+		"--config", fmt.Sprintf("../../%v.yaml", name),
+		"--network", "../../network.yaml",
+		"--log-level", "trace",
+		"--log-file", fmt.Sprintf("%v.log", name),
+		"--stdio",
+	}
+	cmd := exec.Command("go", args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	return &Cmd{cmd, stdin}, nil
+}
+
+const blockTime = 5 * time.Second
+
 func TestNodes(t *testing.T) {
-	alice, _, err := expect.Spawn("go run ../../main.go demo --config ../../alice.yaml --network ../../network.yaml --log-level trace --test-api true --log-file alice.log --stdio", -1)
+	// Start Alice
+	alice, err := nodeCmd("alice")
 	require.NoError(t, err)
-	defer alice.Close()
-	time.Sleep(time.Second * 2)
+	require.NoError(t, alice.Start())
+	defer alice.Process.Kill()
+	time.Sleep(blockTime * time.Duration(2)) // wait 2 blocks for contract deployment
 
-	bob, _, err := expect.Spawn("go run ../../main.go demo --config ../../bob.yaml --network ../../network.yaml --log-level trace --log-file bob.log --stdio", -1)
+	// Start Bob
+	bob, err := nodeCmd("bob")
 	require.NoError(t, err)
-	defer bob.Close()
+	require.NoError(t, bob.Start())
+	defer bob.Process.Kill()
+	time.Sleep(5 * time.Second) // give bob some time to initialize
 
-	// Alice start
-	_, _, e := alice.Expect(any, timeout)
-	require.NoError(t, e)
-
-	// Bob start
-	_, _, e = bob.Expect(any, timeout)
-	require.NoError(t, e)
-	time.Sleep(time.Second * 5)
-
-	// Alice proposing channel to Bob
-	require.NoError(t, sendSynchron(t, alice, "open bob 1000 1000\n"), "proposing channel")
-	// Bob accepting channel proposal
-	require.NoError(t, sendSynchron(t, alice, "y\n"), "accepting channel proposal")
+	// Alice opens channel with Bob
+	require.NoError(t, alice.sendCommand("open bob 1000 1000\n"), "proposing channel")
+	require.NoError(t, bob.sendCommand("y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")
-	time.Sleep(time.Second * 5)
-	// Alice send to Bob and Bob to Alice
+	time.Sleep(blockTime) // wait 1 block for funding transactions to be confirmed
+
+	// Alice sends to Bob and Bob to Alice
 	for i := 0; i < 25; i++ {
 		t.Log("Sending payment… (alice->bob)")
-		require.NoError(t, sendSynchron(t, alice, "send bob 1\n"))
+		require.NoError(t, alice.sendCommand("send bob 1\n"))
+		time.Sleep(100 * time.Millisecond)
 		t.Log("Sending payment… (bob->alice)")
-		require.NoError(t, sendSynchron(t, bob, "send alice 2\n"))
+		require.NoError(t, bob.sendCommand("send alice 2\n"))
+		time.Sleep(100 * time.Millisecond)
 	}
 	t.Log("Done")
-
-	// Alice get balances
-	time.Sleep(time.Second)
-	b, err := getBalances()
-	require.NoError(t, err)
-	t.Log("Balances: ", b)
-	assert.Equal(t, "{\"bob\":{\"My\":1025,\"Other\":975}}", b)
 }
 
-func getBalances() (string, error) {
-	conn, err := net.Dial("tcp", "127.0.0.1:8080")
-	if err != nil {
-		return "", err
-	}
-	defer conn.Close()
-	fmt.Fprintf(conn, "getbals")
-	buff := make([]byte, 1024)
-	n, err := conn.Read(buff)
-	if err != nil {
-		return "", err
-	}
-	return string(buff[0:n]), nil
-}
-
-func sendSynchron(t *testing.T, obj *expect.GExpect, str string) error {
-	for _, b := range []byte(str) {
-		time.Sleep(time.Millisecond * 10)
-		if err := obj.Send(string([]byte{b})); err != nil {
-			return err
-		}
-	}
-	_, _, err := obj.Expect(any, timeout)
+func (cmd *Cmd) sendCommand(str string) error {
+	_, err := io.WriteString(cmd.stdin, str)
 	return err
 }
