@@ -294,9 +294,16 @@ func (n *node) handleFinal(p *peer) {
 func (n *node) Open(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer := n.peers[args[0]]
+	peerName := args[0]
+	peer := n.peers[peerName]
 	if peer == nil {
-		return errors.Errorf("peer not found %s", args[0])
+		// try to connect to peer
+		n.mtx.Unlock()
+		if err := n.Connect([]string{peerName}); err != nil {
+			return err
+		}
+		n.mtx.Lock()
+		peer = n.peers[peerName]
 	}
 	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
 	peerBalEth, _ := new(big.Float).SetString(args[2])
