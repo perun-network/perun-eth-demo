@@ -3,8 +3,6 @@
 // perun-eth-demo. Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-// +build on_chain_eth_test
-
 package demo_test
 
 import (
@@ -25,12 +23,12 @@ var (
 )
 
 func TestNodes(t *testing.T) {
-	alice, _, err := expect.Spawn("go run ../../main.go demo --config ../../alice.yaml --network ../../network.yaml --log-level trace --test-api true --log-file alice.log", -1)
+	alice, _, err := expect.Spawn("go run ../../main.go demo --config ../../alice.yaml --network ../../network.yaml --log-level trace --test-api true --log-file alice.log --stdio", -1)
 	require.NoError(t, err)
 	defer alice.Close()
 	time.Sleep(time.Second * 2)
 
-	bob, _, err := expect.Spawn("go run ../../main.go demo --config ../../bob.yaml --network ../../network.yaml --log-level trace --log-file bob.log", -1)
+	bob, _, err := expect.Spawn("go run ../../main.go demo --config ../../bob.yaml --network ../../network.yaml --log-level trace --log-file bob.log --stdio", -1)
 	require.NoError(t, err)
 	defer bob.Close()
 
@@ -43,12 +41,10 @@ func TestNodes(t *testing.T) {
 	require.NoError(t, e)
 	time.Sleep(time.Second * 5)
 
-	// Alice connect to Bob
-	require.NoError(t, sendSynchron(t, alice, "connect bob\n"), "connecting")
-	t.Log("Alice connected")
-	time.Sleep(time.Second * 1)
-	// Alice open channel to Bob
-	require.NoError(t, sendSynchron(t, alice, "open bob 1000 1000\n"), "opening")
+	// Alice proposing channel to Bob
+	require.NoError(t, sendSynchron(t, alice, "open bob 1000 1000\n"), "proposing channel")
+	// Bob accepting channel proposal
+	require.NoError(t, sendSynchron(t, alice, "y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")
 	time.Sleep(time.Second * 5)
 	// Alice send to Bob and Bob to Alice
