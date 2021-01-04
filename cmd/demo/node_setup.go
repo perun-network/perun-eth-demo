@@ -8,6 +8,7 @@ package demo
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"text/tabwriter"
@@ -15,13 +16,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
-	"perun.network/go-perun/apps/payment"
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
+	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	"perun.network/go-perun/channel/persistence/keyvalue"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -40,9 +42,6 @@ var (
 func Setup() {
 	SetConfig()
 
-	appDef := &ewallet.Address{} // dummy app def
-	payment.SetAppDef(appDef)
-
 	var err error
 	if ethereumBackend, err = ethclient.Dial(config.Chain.URL); err != nil {
 		log.WithError(err).Fatalln("Could not connect to ethereum node.")
@@ -58,13 +57,14 @@ func newNode() (*node, error) {
 		return nil, errors.WithMessage(err, "importing secret key")
 	}
 	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
+	signer := types.NewEIP155Signer(big.NewInt(1337))
 
 	n := &node{
 		log:     log.Get(),
 		onChain: acc,
 		wallet:  wallet,
 		dialer:  dialer,
-		cb:      echannel.NewContractBackend(ethereumBackend, wallet.Ks, &acc.Account),
+		cb:      echannel.NewContractBackend(ethereumBackend, pkeystore.NewTransactor(*wallet, signer)),
 		peers:   make(map[string]*peer),
 	}
 	return n, n.setup()
@@ -120,19 +120,19 @@ func (n *node) setupContracts() error {
 			assAddr, err = validateAssetHolder(n.cb, adjAddr) // validate asset holder
 		}
 	case contractSetupOptionDeploy:
-		if adjAddr, err = deployAdjudicator(n.cb); err == nil { // deploy adjudicator
-			assAddr, err = deployAssetHolder(n.cb, adjAddr) // deploy asset holder
+		if adjAddr, err = deployAdjudicator(n.cb, n.onChain.Account); err == nil { // deploy adjudicator
+			assAddr, err = deployAssetHolder(n.cb, adjAddr, n.onChain.Account) // deploy asset holder
 		}
 	case contractSetupOptionValidateOrDeploy:
 		if adjAddr, err = validateAdjudicator(n.cb); err != nil { // validate adjudicator
 			fmt.Println("❌ Adjudicator invalid")
-			adjAddr, err = deployAdjudicator(n.cb) // deploy adjudicator
+			adjAddr, err = deployAdjudicator(n.cb, n.onChain.Account) // deploy adjudicator
 		}
 
 		if err == nil {
 			if assAddr, err = validateAssetHolder(n.cb, adjAddr); err != nil { // validate asset holder
 				fmt.Println("❌ Asset holder invalid")
-				assAddr, err = deployAssetHolder(n.cb, adjAddr) // deploy asset holder
+				assAddr, err = deployAssetHolder(n.cb, adjAddr, n.onChain.Account) // deploy asset holder
 			}
 		}
 	default:
@@ -147,10 +147,13 @@ func (n *node) setupContracts() error {
 	n.adjAddr = adjAddr
 	n.assetAddr = assAddr
 	recvAddr := ewallet.AsEthAddr(n.onChain.Address())
-	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, recvAddr)
-	n.funder = echannel.NewETHFunder(n.cb, n.assetAddr)
+	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, recvAddr, n.onChain.Account)
 	n.asset = (*ewallet.Address)(&n.assetAddr)
 	n.log.WithField("Adj", n.adjAddr).WithField("Asset", n.assetAddr).Debug("Set contracts")
+
+	accounts := map[echannel.Asset]accounts.Account{ewallet.Address(n.assetAddr): n.onChain.Account}
+	depositors := map[echannel.Asset]echannel.Depositor{ewallet.Address(n.assetAddr): new(echannel.ETHDepositor)}
+	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
 
 	return nil
 }
@@ -199,26 +202,26 @@ func validateAssetHolder(cb echannel.ContractBackend, adjAddr common.Address) (c
 
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
 // or an error.
-func deployAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
+func deployAdjudicator(cb echannel.ContractBackend, acc accounts.Account) (common.Address, error) {
 	fmt.Println("🌐 Deploy adjudicator")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
-	adjAddr, err := echannel.DeployAdjudicator(ctx, cb)
+	adjAddr, err := echannel.DeployAdjudicator(ctx, cb, acc)
 	return adjAddr, errors.WithMessage(err, "deploying eth adjudicator")
 }
 
 // deployAssetHolder deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
-func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address) (common.Address, error) {
+func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address, acc accounts.Account) (common.Address, error) {
 	fmt.Println("🌐 Deploy asset holder")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
-	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator)
+	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator, acc)
 	return asset, errors.WithMessage(err, "deploying eth assetholder")
 }
 
 // importAccount is a helper method to import secret keys until we have the ethereum wallet done.
-func importAccount(secret string) (*ewallet.Wallet, *ewallet.Account, error) {
+func importAccount(secret string) (*pkeystore.Wallet, *pkeystore.Account, error) {
 	ks := keystore.NewKeyStore(config.WalletPath, 2, 1)
 	sk, err := crypto.HexToECDSA(secret[2:])
 	if err != nil {
@@ -233,14 +236,14 @@ func importAccount(secret string) (*ewallet.Wallet, *ewallet.Account, error) {
 		}
 	}
 
-	wallet, err := ewallet.NewWallet(ks, "")
+	wallet, err := pkeystore.NewWallet(ks, "")
 	if err != nil {
 		return nil, nil, errors.WithMessage(err, "creating wallet")
 	}
 
-	wAcc := ewallet.NewAccountFromEth(wallet, &ethAcc)
+	wAcc := pkeystore.NewAccountFromEth(wallet, &ethAcc)
 	acc, err := wallet.Unlock(wAcc.Address())
-	return wallet, acc.(*ewallet.Account), err
+	return wallet, acc.(*pkeystore.Account), err
 }
 
 func newTransactionContext() (context.Context, context.CancelFunc) {
