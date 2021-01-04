@@ -319,7 +319,6 @@ func (n *node) Open(args []string) error {
 		initBals,
 		[]wire.Address{n.onChain.Address(), peer.perunID},
 		client.WithNonce(nonce()),
-		client.WithApp(app, appData),
 	)
 	if err != nil {
 		return errors.WithMessage(err, "creating channel proposal")

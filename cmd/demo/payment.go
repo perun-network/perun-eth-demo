@@ -11,6 +11,7 @@ import (
 	"math/big"
 
 	"github.com/pkg/errors"
+	"perun.network/go-perun/apps/payment"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -97,18 +98,24 @@ func stateBals(state *channel.State) []channel.Bal {
 }
 
 func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.UpdateResponder) {
-	oldBal := stateBals(ch.lastState)
-	balChanged := oldBal[0].Cmp(update.State.Balances[0][0]) != 0
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.Timeout)
 	defer cancel()
+
+	var app payment.App // Can be nil
+	if err := app.ValidTransition(nil, ch.lastState, update.State, update.ActorIdx); err != nil {
+		reason := fmt.Sprintf("ValidTransition: %v", err)
+		PrintfAsync("⚡ Rejecting update for: %s", reason)
+		if err := res.Reject(ctx, reason); err != nil {
+			ch.log.Error(errors.WithMessage(err, "handling payment update"))
+		}
+		return
+	}
+
 	if err := res.Accept(ctx); err != nil {
 		ch.log.Error(errors.WithMessage(err, "handling payment update"))
 	}
-
-	if balChanged {
-		bals := weiToEther(update.State.Allocation.Balances[0]...)
-		PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
-	}
+	bals := weiToEther(update.State.Allocation.Balances[0]...)
+	PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	if update.State.IsFinal {
 		ch.log.Trace("Calling onFinal handler for paymentChannel")
 		go ch.onFinal()

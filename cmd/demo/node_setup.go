@@ -21,11 +21,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
-	"perun.network/go-perun/apps/payment"
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
-	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence/keyvalue"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -37,18 +35,12 @@ import (
 var (
 	backend         *node
 	ethereumBackend *ethclient.Client
-	app             = &payment.App{Addr: &ewallet.Address{}}
-	appData         = payment.Data()
 )
 
 // Setup initializes the node, can not be done in init() since it needs the
 // configuration from viper.
 func Setup() {
 	SetConfig()
-
-	// The payment app currently has no on-chain logic. Therefore, we do not
-	// need to deploy the app on-chain.
-	channel.RegisterApp(app)
 
 	var err error
 	if ethereumBackend, err = ethclient.Dial(config.Chain.URL); err != nil {
