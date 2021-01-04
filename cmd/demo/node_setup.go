@@ -114,6 +114,8 @@ func (n *node) setupContracts() error {
 	var assAddr common.Address
 	var err error
 
+	fmt.Println("💭 Validating contracts...")
+
 	switch contractSetup := config.Chain.contractSetup; contractSetup {
 	case contractSetupOptionValidate:
 		if adjAddr, err = validateAdjudicator(n.cb); err == nil { // validate adjudicator
@@ -139,6 +141,8 @@ func (n *node) setupContracts() error {
 		// unsupported setup method
 		err = errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
 	}
+
+	fmt.Println("✅ Contracts validated.")
 
 	if err != nil {
 		return errors.WithMessage(err, "contract setup failed")
@@ -181,8 +185,6 @@ func (n *node) setupPersistence() error {
 }
 
 func validateAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
-	fmt.Println("🌐 Validate adjudicator")
-
 	ctx, cancel := newTransactionContext()
 	defer cancel()
 
@@ -191,8 +193,6 @@ func validateAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
 }
 
 func validateAssetHolder(cb echannel.ContractBackend, adjAddr common.Address) (common.Address, error) {
-	fmt.Println("🌐 Validate asset holder")
-
 	ctx, cancel := newTransactionContext()
 	defer cancel()
 
@@ -203,7 +203,7 @@ func validateAssetHolder(cb echannel.ContractBackend, adjAddr common.Address) (c
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
 // or an error.
 func deployAdjudicator(cb echannel.ContractBackend, acc accounts.Account) (common.Address, error) {
-	fmt.Println("🌐 Deploy adjudicator")
+	fmt.Println("🌐 Deploying adjudicator")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	adjAddr, err := echannel.DeployAdjudicator(ctx, cb, acc)
@@ -213,7 +213,7 @@ func deployAdjudicator(cb echannel.ContractBackend, acc accounts.Account) (commo
 // deployAssetHolder deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
 func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address, acc accounts.Account) (common.Address, error) {
-	fmt.Println("🌐 Deploy asset holder")
+	fmt.Println("🌐 Deploying asset holder")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator, acc)
