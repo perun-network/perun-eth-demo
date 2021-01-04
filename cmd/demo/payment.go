@@ -108,7 +108,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 	if balChanged {
 		bals := weiToEther(update.State.Allocation.Balances[0]...)
-		fmt.Printf("\n💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+		PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	}
 	ch.lastState = update.State.Clone()
 }

@@ -145,15 +145,13 @@ func (n *node) setupChannel(ch *client.Channel) {
 	}()
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("\n🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	fmt.Printf("🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
 func (n *node) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
-	fmt.Printf("\n🎭 On-chain event: %v\n", e)
-
 	if _, ok := e.(*channel.ConcludedEvent); ok {
-		fmt.Printf("\n🎭 Concluded event\n")
+		PrintfAsync("🎭 Received concluded event\n")
 		func() {
 			n.mtx.Lock()
 			defer n.mtx.Unlock()
@@ -163,9 +161,11 @@ func (n *node) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
 				// already be removed and we return.
 				return
 			}
-			if err := n.settle(n.channelPeer(ch.Channel)); err != nil {
-				fmt.Printf("\n🎭 error while settling: %v\n", err)
+			peer := n.channelPeer(ch.Channel)
+			if err := n.settle(peer); err != nil {
+				PrintfAsync("🎭 error while settling: %v\n", err)
 			}
+			PrintfAsync("🏁 Settled channel with %s.\n", peer.alias)
 		}()
 	}
 }
@@ -232,8 +232,6 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
-	defer cancel()
 	id := req.Peers[0]
 	n.log.Debug("Received channel propsal")
 
@@ -243,7 +241,11 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 	if p == nil {
 		if cfg == nil {
-			res.Reject(ctx, "Unknown identity")
+			ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+			defer cancel()
+			if err := res.Reject(ctx, "Unknown identity"); err != nil {
+				n.log.WithError(err).Warn("rejecting")
+			}
 			return
 		}
 		p = &peer{
@@ -256,15 +258,29 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
-	fmt.Printf("\n💭 Received channel proposal from %v with funding %v.\n", alias, weiToEther(req.InitBals.Balances[0]...))
+	bals := weiToEther(req.InitBals.Balances[0]...)
+	theirBal := bals[0] // proposer has index 0
+	ourBal := bals[1]   // proposal receiver has index 1
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with funding [My: %v Ξ, Peer: %v Ξ].\nAccept (y/n)? ", alias, ourBal, theirBal)
+	Prompt(msg, func(userInput string) {
+		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+		defer cancel()
 
-	a := req.Accept(n.offChain.Address(), client.WithRandomNonce())
-	if _, err := res.Accept(ctx, a); err != nil {
-		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
-		return
-	}
-
-	fmt.Println("✅ Channel proposal accepted")
+		if userInput == "y" {
+			fmt.Printf("✅ Channel proposal accepted. Opening channel...\n")
+			a := req.Accept(n.offChain.Address(), client.WithRandomNonce())
+			if _, err := res.Accept(ctx, a); err != nil {
+				n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
+				return
+			}
+		} else {
+			fmt.Printf("❌ Channel proposal rejected\n")
+			if err := res.Reject(ctx, "rejected by user"); err != nil {
+				n.log.Error(errors.WithMessage(err, "rejecting channel proposal"))
+				return
+			}
+		}
+	})
 }
 
 func (n *node) Open(args []string) error {
@@ -337,7 +353,11 @@ func (n *node) Close(args []string) error {
 		return errors.WithMessage(err, "sending final state for state closing")
 	}
 
-	return n.settle(peer)
+	if err := n.settle(peer); err != nil {
+		return errors.WithMessage(err, "settling")
+	}
+	fmt.Printf("\r🏁 Settled channel with %s.\n", peer.alias)
+	return nil
 }
 
 func (n *node) settle(p *peer) error {
@@ -352,14 +372,11 @@ func (n *node) settle(p *peer) error {
 		return errors.WithMessage(err, "settling the channel")
 	}
 
-	finalBals := weiToEther(p.ch.GetBalances())
 	if err := p.ch.Close(); err != nil {
 		return errors.WithMessage(err, "channel closing")
 	}
 	p.ch.log.Debug("Removing channel")
 	p.ch = nil
-	fmt.Printf("\n🏁 Settled channel with %s. Final Balance: [My: %v Ξ, Peer: %v Ξ]\n", p.alias, finalBals[0], finalBals[1])
-
 	return nil
 }
 
