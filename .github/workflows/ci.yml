@@ -29,6 +29,7 @@ jobs:
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep ensure
         fi
+        docker pull trufflesuite/ganache-cli
 
     # Github does not allow the use of ! as negation. We also neet to add
     # the *.go because otherwise the main.go is not formatted.
@@ -67,7 +68,8 @@ jobs:
         find -name '*.go' -not -name '*_test.go' -exec gocyclo -over 15 {} +
 
     - name: Unit Test
-      run: go test -timeout 120s -cover ./...
-
-    - name: Race Test
-      run: go test -timeout 120s -race -gcflags=all=-d=checkptr=0 ./...
+      run: |
+        docker run --name chain --rm --net=host trufflesuite/ganache-cli --account="0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9,100000000000000000000000" --account="0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a,100000000000000000000000" --block-time 5 &
+        sleep 5
+        go test -timeout 120s -cover ./...
+        docker stop chain
