@@ -13,15 +13,14 @@ import (
 	"strconv"
 	"sync"
 	"text/tabwriter"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"perun.network/go-perun/apps/payment"
 	_ "perun.network/go-perun/backend/ethereum" // backend init
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
+	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -46,11 +45,11 @@ type node struct {
 	dialer *simple.Dialer
 
 	// Account for signing on-chain TX. Currently also the Perun-ID.
-	onChain wallet.Account
+	onChain *pkeystore.Account
 	// Account for signing off-chain TX. Currently one Account for all
 	// state channels, later one we want one Account per Channel.
 	offChain wallet.Account
-	wallet   *ewallet.Wallet
+	wallet   *pkeystore.Wallet
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
@@ -80,9 +79,11 @@ func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, er
 func (n *node) Connect(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	n.log.Traceln("Connecting...")
-	alias := args[0]
+	return n.connect(args[0])
+}
 
+func (n *node) connect(alias string) error {
+	n.log.Traceln("Connecting...")
 	if n.peers[alias] != nil {
 		return errors.New("Peer already connected")
 	}
@@ -99,6 +100,8 @@ func (n *node) Connect(args []string) error {
 		log:     log.WithField("peer", peerCfg.perunID),
 	}
 
+	fmt.Printf("📡 Connected to %v. Ready to open channel.\n", alias)
+
 	return nil
 }
 
@@ -110,6 +113,11 @@ func (n *node) peer(addr wire.Address) *peer {
 		}
 	}
 	return nil
+}
+
+func (n *node) channelPeer(ch *client.Channel) *peer {
+	perunID := ch.Peers()[1-ch.Idx()] // assumes two-party channel
+	return n.peer(perunID)
 }
 
 func (n *node) setupChannel(ch *client.Channel) {
@@ -128,14 +136,40 @@ func (n *node) setupChannel(ch *client.Channel) {
 		return
 	}
 
-	// This also starts the watcher.
-	p.ch = newPaymentChannel(ch, func() {
-		n.handleFinal(p)
-	})
+	p.ch = newPaymentChannel(ch)
+
+	// Start watching.
+	go func() {
+		l := log.WithField("channel", ch.ID())
+		l.Debug("Watcher started")
+		err := ch.Watch(n)
+		l.WithError(err).Debug("Watcher stopped")
+	}()
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("\n🆕 OnNewChannel with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	fmt.Printf("🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+}
+
+func (n *node) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
+	if _, ok := e.(*channel.ConcludedEvent); ok {
+		PrintfAsync("🎭 Received concluded event\n")
+		func() {
+			n.mtx.Lock()
+			defer n.mtx.Unlock()
+			ch := n.channel(e.ID())
+			if ch == nil {
+				// If we initiated the channel closing, then the channel should
+				// already be removed and we return.
+				return
+			}
+			peer := n.channelPeer(ch.Channel)
+			if err := n.settle(peer); err != nil {
+				PrintfAsync("🎭 error while settling: %v\n", err)
+			}
+			PrintfAsync("🏁 Settled channel with %s.\n", peer.alias)
+		}()
+	}
 }
 
 type balTuple struct {
@@ -188,16 +222,19 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 	return nil
 }
 
-func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalResponder) {
-	if len(req.PeerAddrs) != 2 {
+func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalResponder) {
+	req, ok := prop.(*client.LedgerChannelProposal)
+	if !ok {
+		log.Fatal("Can handle only ledger channel proposals.")
+	}
+
+	if len(req.Peers) != 2 {
 		log.Fatal("Only channels with two participants are currently supported")
 	}
 
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
-	defer cancel()
-	id := req.PeerAddrs[0]
+	id := req.Peers[0]
 	n.log.Debug("Received channel propsal")
 
 	// Find the peer by its perunID and create it if not present
@@ -206,7 +243,11 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 
 	if p == nil {
 		if cfg == nil {
-			res.Reject(ctx, "Unknown identity")
+			ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+			defer cancel()
+			if err := res.Reject(ctx, "Unknown identity"); err != nil {
+				n.log.WithError(err).Warn("rejecting")
+			}
 			return
 		}
 		p = &peer{
@@ -219,32 +260,42 @@ func (n *node) HandleProposal(req *client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel propsal")
 
-	if _, err := res.Accept(ctx, client.ProposalAcc{
-		Participant: n.offChain.Address(),
-	}); err != nil {
-		n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
-		return
-	}
-}
+	bals := weiToEther(req.InitBals.Balances[0]...)
+	theirBal := bals[0] // proposer has index 0
+	ourBal := bals[1]   // proposal receiver has index 1
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with funding [My: %v Ξ, Peer: %v Ξ].\nAccept (y/n)? ", alias, ourBal, theirBal)
+	Prompt(msg, func(userInput string) {
+		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+		defer cancel()
 
-// handleFinal is called when the channel with peer `p` received a final update,
-// indicating closure.
-func (n *node) handleFinal(p *peer) {
-	// Without on-chain watchers we just wait one second before try to settle.
-	// Otherwise out settling could collide with the other party's.
-	// Needs to be increased for geth-nodes but works for ganache.
-	time.Sleep(time.Second)
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
-	n.settle(p)
+		if userInput == "y" {
+			fmt.Printf("✅ Channel proposal accepted. Opening channel...\n")
+			a := req.Accept(n.offChain.Address(), client.WithRandomNonce())
+			if _, err := res.Accept(ctx, a); err != nil {
+				n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
+				return
+			}
+		} else {
+			fmt.Printf("❌ Channel proposal rejected\n")
+			if err := res.Reject(ctx, "rejected by user"); err != nil {
+				n.log.Error(errors.WithMessage(err, "rejecting channel proposal"))
+				return
+			}
+		}
+	})
 }
 
 func (n *node) Open(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
-	peer := n.peers[args[0]]
+	peerName := args[0]
+	peer := n.peers[peerName]
 	if peer == nil {
-		return errors.Errorf("peer not found %s", args[0])
+		// try to connect to peer
+		if err := n.connect(peerName); err != nil {
+			return err
+		}
+		peer = n.peers[peerName]
 	}
 	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
 	peerBalEth, _ := new(big.Float).SetString(args[2])
@@ -253,15 +304,19 @@ func (n *node) Open(args []string) error {
 		Assets:   []channel.Asset{n.asset},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
-	prop := &client.ChannelProposal{
-		ChallengeDuration: config.Channel.ChallengeDurationSec,
-		Nonce:             nonce(),
-		ParticipantAddr:   n.offChain.Address(),
-		AppDef:            payment.AppDef(),
-		InitData:          new(payment.NoData),
-		InitBals:          initBals,
-		PeerAddrs:         []wallet.Address{n.onChain.Address(), peer.perunID},
+
+	prop, err := client.NewLedgerChannelProposal(
+		config.Channel.ChallengeDurationSec,
+		n.offChain.Address(),
+		initBals,
+		[]wire.Address{n.onChain.Address(), peer.perunID},
+		client.WithRandomNonce(),
+	)
+	if err != nil {
+		return errors.WithMessage(err, "creating channel proposal")
 	}
+
+	fmt.Printf("💭 Proposing channel to %v...\n", peerName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
 	defer cancel()
@@ -305,15 +360,22 @@ func (n *node) Close(args []string) error {
 		return errors.WithMessage(err, "sending final state for state closing")
 	}
 
-	return n.settle(peer)
+	if err := n.settle(peer); err != nil {
+		return errors.WithMessage(err, "settling")
+	}
+	fmt.Printf("\r🏁 Settled channel with %s.\n", peer.alias)
+	return nil
 }
 
 func (n *node) settle(p *peer) error {
 	p.ch.log.Debug("Settling")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
-	finalBals := weiToEther(p.ch.GetBalances())
-	if err := p.ch.Settle(ctx); err != nil {
+
+	if err := p.ch.Register(ctx); err != nil {
+		return errors.WithMessage(err, "registering")
+	}
+	if err := p.ch.Settle(ctx, p.ch.Idx() == 0); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}
 
@@ -322,8 +384,6 @@ func (n *node) settle(p *peer) error {
 	}
 	p.ch.log.Debug("Removing channel")
 	p.ch = nil
-	fmt.Printf("\n🏁 Settled channel with %s. Final Balance: [My: %v Ξ, Peer: %v Ξ]\n", p.alias, finalBals[0], finalBals[1])
-
 	return nil
 }
 

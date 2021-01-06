@@ -19,7 +19,7 @@ The authors take no responsibility for any loss of digital assets or other damag
 
 ## Getting Started
 
-Running _perun-eth-demo_ requires a working Go distribution (version 1.14 or higher). Optionally, [ganache-cli](https://github.com/trufflesuite/ganache-cli) needs to be installed for following the walkthrough. _perun-eth-demo_ works with any ethereum node.
+Running _perun-eth-demo_ requires [Go 1.15](https://golang.org) or higher. To follow the walkthrough we recommend to also install [ganache-cli](https://github.com/trufflesuite/ganache-cli), but _perun-eth-demo_ works with any ethereum node.
 ```sh
 # Clone the repository into a directory of your choice
 git clone https://github.com/perun-network/perun-eth-demo
@@ -32,7 +32,7 @@ go build
 
 ## Demo
 
-The currently only sub-command is `demo`, which starts the CLI node. The node's
+Currently, the only available sub-command of _perun-eth-demo_ is `demo`, which starts the CLI node. The node's
 configuration file can be chosen with the `--config` flag. Two sample
 configurations `alice.yaml` and `bob.yaml` are provided. A default network
 configuration for Alice and Bob is provided in file `network.yaml`.
@@ -57,13 +57,15 @@ Bob validates the contracts at startup and quits if the contracts have not been 
 You can see two transactions in the ganache terminal corresponding to the
 deployment of the `AssetHolder` and `Adjudicator` contracts.
 
-Once both CLIs are running, e.g. in Alice's terminal, connect to bob with
-```
-> connect bob
-```
-Then open a payment channel with 100 ETH deposit from both sides with
+Once both CLIs are running, e.g. in Alice's terminal, propose a payment channel
+to Bob with 100 ETH deposit from both sides via the following command.
 ```
 > open bob 100 100
+```
+In Alice's terminal, accept the appearing channel proposal.
+```
+🔁 Incoming channel proposal from alice with funding [My: 10 Ξ, Peer: 10 Ξ].
+Accept (y/n)? > y
 ```
 In the ganache terminal, you can see two new transactions, which correspond to
 the funding transactions by Alice and Bob.
@@ -79,10 +81,9 @@ You may always check the current status with command `info`.
 
 You can also run a performance benchmark with command
 ```
-> benchmark alice 1000
+> benchmark alice 10 100
 ```
-which will benchmark 1000 transactions without updating the payment channel
-balances. The results will be printed in a table.
+which will send 10 ETH in 100 micro-transactions from Bob to Alice. Transaction performance will be printed in a table.
 
 Finally, you can settle the channel on either side with
 ```

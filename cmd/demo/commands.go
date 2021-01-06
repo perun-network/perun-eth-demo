@@ -27,8 +27,11 @@ type command struct {
 }
 
 var commands []command
+var cmdInput chan string
 
 func init() {
+	cmdInput = make(chan string, 1)
+
 	commands = []command{
 		{
 			"connect",
@@ -37,7 +40,7 @@ func init() {
 			func(args []string) error { return backend.Connect(args) },
 		}, {
 			"open",
-			[]argument{{"Peer", valPeer}, {"Our Balance", valBal}, {"Their Balance", valBal}},
+			[]argument{{"Peer", valAlias}, {"Our Balance", valBal}, {"Their Balance", valBal}},
 			"Open a payment channel with the given peer and balances. The first value is the own balance and the second value is the peers balance. It is only possible to open one channel per peer.\nExample: open alice 10 10",
 			func(args []string) error { return backend.Open(args) },
 		}, {
@@ -58,12 +61,12 @@ func init() {
 		}, {
 			"info",
 			nil,
-			"Print the current open state channels.",
+			"Print information about funds, peers, and channels.",
 			func(args []string) error { return backend.Info(args) },
 		}, {
 			"benchmark",
-			[]argument{{"Peer", valPeer}, {"n", valUInt}},
-			"Performs a benchmark with the given peer by updating a state channel n times.Must have an open channel with the peer.",
+			[]argument{{"Peer", valPeer}, {"amount", valUInt}, {"txCount", valUInt}},
+			"Performs a benchmark with the given peer by sending amount ETH in txCount micro transactions. Must have an open channel with the peer.",
 			func(args []string) error { return backend.Benchmark(args) },
 		}, {
 			"help",
@@ -85,9 +88,36 @@ func init() {
 	}
 }
 
-// Executor interprets commands entered by the user.
-// Gets called by Cobra, but could also be used for emulating user input.
-func Executor(in string) error {
+var prompts = make(chan func(string), 1)
+
+// AddInput adds an input to the input command queue.
+func AddInput(in string) {
+	select {
+	case f := <-prompts:
+		f(in)
+	default:
+		if err := Execute(in); err != nil {
+			fmt.Println("\033[0;33m⚡\033[0m", err)
+		}
+	}
+}
+
+// Prompt waits for input on the command line and then executes the given
+// function with the input.
+func Prompt(msg string, f func(string)) {
+	PrintfAsync(msg)
+	prompts <- f
+}
+
+// PrintfAsync prints the given message for an asynchronous event. More
+// precisely, the message is prepended with a newline and appended with the
+// command prefix.
+func PrintfAsync(format string, a ...interface{}) {
+	fmt.Printf("\r"+format+"> ", a...)
+}
+
+// Execute interprets commands entered by the user.
+func Execute(in string) error {
 	in = strings.TrimSpace(in)
 	args := strings.Split(in, " ")
 	command := args[0]
@@ -107,7 +137,10 @@ func Executor(in string) error {
 			return cmd.Function(args)
 		}
 	}
-	return errors.Errorf("Unknown command: %s", command)
+	if len(command) > 0 {
+		return errors.Errorf("Unknown command: %s. Enter \"help\" for a list of commands.", command)
+	}
+	return nil
 }
 
 func printHelp(args []string) error {

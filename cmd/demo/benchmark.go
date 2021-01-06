@@ -7,6 +7,7 @@ package demo
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"text/tabwriter"
@@ -14,8 +15,6 @@ import (
 
 	"github.com/montanaflynn/stats"
 	"github.com/pkg/errors"
-
-	"perun.network/go-perun/channel"
 )
 
 type run struct {
@@ -53,10 +52,11 @@ func (n *node) Benchmark(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	peer := n.peers[args[0]]
-	x, _ := strconv.Atoi(args[1])
+	totalAmountEth, _ := strconv.Atoi(args[1])
+	txCount, _ := strconv.Atoi(args[2])
 	var r run
 
-	if x < 1 {
+	if txCount < 1 {
 		return errors.New("Number of runs cant be less than 1")
 	} else if peer == nil {
 		return errors.New("Peer not found")
@@ -64,9 +64,11 @@ func (n *node) Benchmark(args []string) error {
 		return errors.New("Open a state channel first")
 	}
 
-	for i := 0; i < x; i++ {
+	totalAmountWei := etherToWei(big.NewFloat(float64(totalAmountEth)))[0]
+	txAmount := new(big.Int).Div(totalAmountWei, big.NewInt(int64(txCount)))
+	for i := 0; i < txCount; i++ {
 		r.Start()
-		if err := peer.ch.sendUpdate(func(*channel.State) {}, "benchmark"); err != nil {
+		if err := peer.ch.sendMoney(txAmount); err != nil {
 			return errors.WithMessage(err, "could not send update")
 		}
 		r.Stop()

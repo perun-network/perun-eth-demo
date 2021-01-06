@@ -10,7 +10,7 @@ channel:
 
 node:
   ip: 0.0.0.0
-  port: 5750
+  port: 5751
   dialTimeout: 30s
   handleTimeout: 30s
   reconnectTimeout: 20s
