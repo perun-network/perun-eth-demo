@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Copyright (c) 2021 Chair of Applied Cryptography, Technische Universität
 // Darmstadt, Germany. All rights reserved. This file is part of
 // perun-eth-demo. Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
@@ -62,21 +62,21 @@ const (
 )
 
 func TestNodes(t *testing.T) {
-	// Start Alice
+	// Start Alice.
 	alice, err := nodeCmd("alice")
 	require.NoError(t, err)
 	require.NoError(t, alice.Start())
 	defer alice.Process.Kill()
 	time.Sleep(blockTime * 2) // Wait 2 blocks for contract deployment.
 
-	// Start Bob
+	// Start Bob.
 	bob, err := nodeCmd("bob")
 	require.NoError(t, err)
 	require.NoError(t, bob.Start())
 	defer bob.Process.Kill()
 	time.Sleep(5 * time.Second) // Give Bob some time to initialize.
 
-	// Get the initial on-chain balances.
+	// Get the initial on-chain balances from Alice and Bob.
 	initBals, err := getOnChainBals()
 	require.NoError(t, err)
 	t.Logf("Initial on-chain balances: Alice = %f, Bob = %f", initBals[0], initBals[1])
@@ -100,9 +100,10 @@ func TestNodes(t *testing.T) {
 
 	t.Log("Closing channel…")
 	require.NoError(t, alice.sendCommand("close bob\n"))
-	// Wait 1 block for the withdrawal transactions and some additional seconds.
-	time.Sleep(blockTime + 10*time.Second)
+	// Wait 2 blocks for the settle and withdrawal transactions plus some additional seconds.
+	time.Sleep(2*blockTime + 5*time.Second)
 
+	// Get the final balances from Alice and Bob after the settlement.
 	finalBals, err := getOnChainBals()
 	require.NoError(t, err)
 
