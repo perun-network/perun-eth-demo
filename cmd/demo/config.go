@@ -88,7 +88,6 @@ type chainConfig struct {
 type netConfigEntry struct {
 	PerunID  string
 	perunID  wire.Address
-	Lel      string
 	Hostname string
 	Port     uint16
 }
