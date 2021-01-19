@@ -14,16 +14,15 @@ import (
 	"text/tabwriter"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
 
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
-	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
+	phd "perun.network/go-perun/backend/ethereum/wallet/hd"
 	"perun.network/go-perun/channel/persistence/keyvalue"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -52,9 +51,9 @@ func Setup() {
 }
 
 func newNode() (*node, error) {
-	wallet, acc, err := importAccount(config.SecretKey)
+	wallet, acc, err := setupWallet(config.Mnemonic, config.AccountIndex)
 	if err != nil {
-		return nil, errors.WithMessage(err, "importing secret key")
+		return nil, errors.WithMessage(err, "importing mnemonic")
 	}
 	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
 	signer := types.NewEIP155Signer(big.NewInt(1337))
@@ -64,7 +63,7 @@ func newNode() (*node, error) {
 		onChain: acc,
 		wallet:  wallet,
 		dialer:  dialer,
-		cb:      echannel.NewContractBackend(ethereumBackend, pkeystore.NewTransactor(*wallet, signer)),
+		cb:      echannel.NewContractBackend(ethereumBackend, phd.NewTransactor(wallet.Wallet(), signer)),
 		peers:   make(map[string]*peer),
 	}
 	return n, n.setup()
@@ -82,12 +81,17 @@ func (n *node) setup() error {
 		return errors.WithMessage(err, "setting up contracts")
 	}
 
-	n.offChain = n.wallet.NewAccount()
+	var err error
+
+	n.offChain, err = n.wallet.NewAccount()
+	if err != nil {
+		return errors.WithMessage(err, "creating account")
+	}
+
 	n.log.WithField("off-chain", n.offChain.Address()).Info("Generating account")
 
 	n.bus = wirenet.NewBus(n.onChain, n.dialer)
 
-	var err error
 	if n.client, err = client.New(n.onChain.Address(), n.bus, n.funder, n.adjudicator, n.wallet); err != nil {
 		return errors.WithMessage(err, "creating client")
 	}
@@ -220,30 +224,24 @@ func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address, 
 	return asset, errors.WithMessage(err, "deploying eth assetholder")
 }
 
-// importAccount is a helper method to import secret keys until we have the ethereum wallet done.
-func importAccount(secret string) (*pkeystore.Wallet, *pkeystore.Account, error) {
-	ks := keystore.NewKeyStore(config.WalletPath, 2, 1)
-	sk, err := crypto.HexToECDSA(secret[2:])
+// setupWallet imports the mnemonic and returns a corresponding wallet and
+// the derived account at the given account index.
+func setupWallet(mnemonic string, accountIndex uint) (*phd.Wallet, *phd.Account, error) {
+	wallet, err := hdwallet.NewFromMnemonic(mnemonic)
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "decoding secret key")
-	}
-	var ethAcc accounts.Account
-	addr := crypto.PubkeyToAddress(sk.PublicKey)
-	if ethAcc, err = ks.Find(accounts.Account{Address: addr}); err != nil {
-		ethAcc, err = ks.ImportECDSA(sk, "")
-		if err != nil && errors.Cause(err).Error() != "account already exists" {
-			return nil, nil, errors.WithMessage(err, "importing secret key")
-		}
+		return nil, nil, errors.WithMessage(err, "creating hdwallet")
 	}
 
-	wallet, err := pkeystore.NewWallet(ks, "")
+	perunWallet, err := phd.NewWallet(wallet, accounts.DefaultBaseDerivationPath.String(), accountIndex)
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "creating wallet")
+		return nil, nil, errors.WithMessage(err, "creating perun wallet")
+	}
+	acc, err := perunWallet.NewAccount()
+	if err != nil {
+		return nil, nil, errors.WithMessage(err, "creating account")
 	}
 
-	wAcc := pkeystore.NewAccountFromEth(wallet, &ethAcc)
-	acc, err := wallet.Unlock(wAcc.Address())
-	return wallet, acc.(*pkeystore.Account), err
+	return perunWallet, acc, nil
 }
 
 func newTransactionContext() (context.Context, context.CancelFunc) {

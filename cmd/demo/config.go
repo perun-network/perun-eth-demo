@@ -20,12 +20,13 @@ import (
 
 // Config contains all configuration read from config.yaml and network.yaml
 type Config struct {
-	Alias      string
-	SecretKey  string
-	WalletPath string
-	Channel    channelConfig
-	Node       nodeConfig
-	Chain      chainConfig
+	Alias        string
+	SecretKey    string
+	Mnemonic     string
+	AccountIndex uint
+	Channel      channelConfig
+	Node         nodeConfig
+	Chain        chainConfig
 	// Read from the network.yaml. The key is the alias.
 	Peers map[string]*netConfigEntry
 }

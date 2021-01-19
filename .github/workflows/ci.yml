@@ -31,7 +31,7 @@ jobs:
         fi
         docker pull trufflesuite/ganache-cli
 
-    # Github does not allow the use of ! as negation. We also neet to add
+    # Github does not allow the use of ! as negation. We also need to add
     # the *.go because otherwise the main.go is not formatted.
     - name: fmt
       run: |
@@ -69,7 +69,7 @@ jobs:
 
     - name: Unit Test
       run: |
-        docker run --name chain --rm --net=host trufflesuite/ganache-cli --account="0x6aeeb7f09e757baa9d3935a042c3d0d46a2eda19e9b676283dce4eaf32e29dc9,100000000000000000000000" --account="0x7d51a817ee07c3f28581c47a5072142193337fdca4d7911e58c5af2d03895d1a,100000000000000000000000" --block-time 5 &
+        docker run --name chain --rm --net=host trufflesuite/ganache-cli -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" --block-time 5 &
         sleep 5
         go test -timeout 120s -cover ./...
         docker stop chain

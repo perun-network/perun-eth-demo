@@ -15,13 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
-
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,8 +55,8 @@ const (
 	blockTime    = 5 * time.Second
 	numUpdates   = 25
 	ethUrl       = "ws://127.0.0.1:8545"
-	addressAlice = "0x05e71027e7d3bd6261de7634cf50F0e2142067C4"
-	addressBob   = "0xA298Fc05bccff341f340a11FffA30567a00e651f"
+	addressAlice = "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B"
+	addressBob   = "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E"
 )
 
 func TestNodes(t *testing.T) {
@@ -82,7 +80,7 @@ func TestNodes(t *testing.T) {
 	t.Logf("Initial on-chain balances: Alice = %f, Bob = %f", initBals[0], initBals[1])
 
 	// Alice opens channel with Bob.
-	require.NoError(t, alice.sendCommand("open bob 1000 1000\n"), "proposing channel")
+	require.NoError(t, alice.sendCommand("open bob 50 50\n"), "proposing channel")
 	time.Sleep(3 * time.Second) // Ensure that Bob really received the proposal.
 	require.NoError(t, bob.sendCommand("y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")
