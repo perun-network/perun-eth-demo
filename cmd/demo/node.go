@@ -20,7 +20,7 @@ import (
 	_ "perun.network/go-perun/backend/ethereum" // backend init
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
-	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
+	phd "perun.network/go-perun/backend/ethereum/wallet/hd"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
@@ -45,11 +45,11 @@ type node struct {
 	dialer *simple.Dialer
 
 	// Account for signing on-chain TX. Currently also the Perun-ID.
-	onChain *pkeystore.Account
+	onChain *phd.Account
 	// Account for signing off-chain TX. Currently one Account for all
 	// state channels, later one we want one Account per Channel.
 	offChain wallet.Account
-	wallet   *pkeystore.Wallet
+	wallet   *phd.Wallet
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
@@ -235,7 +235,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	id := req.Peers[0]
-	n.log.Debug("Received channel propsal")
+	n.log.Debug("Received channel proposal")
 
 	// Find the peer by its perunID and create it if not present
 	p := n.peer(id)
@@ -258,7 +258,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 		n.peers[alias] = p
 		n.log.WithField("channel", id).WithField("alias", alias).Debug("New peer")
 	}
-	n.log.WithField("peer", id).Debug("Channel propsal")
+	n.log.WithField("peer", id).Debug("Channel proposal")
 
 	bals := weiToEther(req.InitBals.Balances[0]...)
 	theirBal := bals[0] // proposer has index 0
