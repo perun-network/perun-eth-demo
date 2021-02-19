@@ -41,7 +41,7 @@ configuration for Alice and Bob is provided in file `network.yaml`.
 In a first terminal, start a `ganache-cli` development blockchain, prefunding
 the accounts of `Alice` and `Bob` derived from the mnemonic seed:
 ```sh
-ganache-cli -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" --block-time 5
+ganache-cli -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" --block-time 5 -e 1000
 ```
 
 In a second terminal, start the node of Alice with
@@ -64,7 +64,7 @@ to Bob with 100 ETH deposit from both sides via the following command.
 ```
 In Alice's terminal, accept the appearing channel proposal.
 ```
-🔁 Incoming channel proposal from alice with funding [My: 10 Ξ, Peer: 10 Ξ].
+🔁 Incoming channel proposal from alice with funding [My: 100 Ξ, Peer: 100 Ξ].
 Accept (y/n)? > y
 ```
 In the ganache terminal, you can see two new transactions, which correspond to
@@ -96,7 +96,7 @@ Now you can exit the CLI with command `exit`.
 
 ## Copyright
 
-Copyright &copy; 2020 Chair of Applied Cryptography, Technische Universität Darmstadt, Germany.
+Copyright &copy; 2021 Chair of Applied Cryptography, Technische Universität Darmstadt, Germany.
 All rights reserved.
 Use of the source code is governed by the Apache 2.0 license that can be found in the [LICENSE file](LICENSE).
 
