@@ -71,5 +71,5 @@ jobs:
       run: |
         docker run --name chain --rm --net=host trufflesuite/ganache-cli -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" --block-time 5 -e 1000 &
         sleep 5
-        go test -timeout 120s -cover ./...
+        go test -timeout 120s -cover ./... || (cat cmd/demo/alice.log cmd/demo/bob.log; exit 1)
         docker stop chain
