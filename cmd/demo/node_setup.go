@@ -56,7 +56,7 @@ func newNode() (*node, error) {
 		return nil, errors.WithMessage(err, "importing mnemonic")
 	}
 	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
-	signer := types.NewEIP155Signer(big.NewInt(1337))
+	signer := types.NewEIP155Signer(big.NewInt(config.Chain.ID))
 
 	n := &node{
 		log:     log.Get(),
