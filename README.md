@@ -101,3 +101,7 @@ All rights reserved.
 Use of the source code is governed by the Apache 2.0 license that can be found in the [LICENSE file](LICENSE).
 
 Contact us at [info@perun.network](mailto:info@perun.network).
+
+#docker run --rm -it --net=host ethereum/client-go:alltools-latest geth attach ws://127.0.0.1:7546
+eth.sendTransaction({from: "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B",to: "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B", value: "7400000000000000000"})
+eth.sendTransaction({from: "0x81183c9c61bdf79db7330bbcda47be30c0a85064",to: "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E", value: "7500000000000000000"})

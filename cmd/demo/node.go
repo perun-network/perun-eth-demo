@@ -199,7 +199,7 @@ func findConfig(id wallet.Address) (string, *netConfigEntry) {
 	return "", nil
 }
 
-func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResponder) {
+func (n *node) HandleUpdate(_ *channel.State, update client.ChannelUpdate, resp *client.UpdateResponder) {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	log := n.log.WithField("channel", update.State.ID)

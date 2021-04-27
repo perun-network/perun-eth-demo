@@ -1,0 +1,25 @@
+alias: bob
+mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
+accountIndex: 1
+
+channel:
+  timeout: 300s
+  fundtimeout: 300s
+  settleTimeout: 300s
+  challengeDurationSec: 600
+
+node:
+  ip: 0.0.0.0
+  port: 5751
+  dialTimeout: 300s
+  handleTimeout: 300s
+  reconnectTimeout: 20s
+  persistencePath: /tmp/bob_database
+
+chain:
+  url: https://kovan.infura.io/v3/f95c9b7131cb4912b43aca853bfe3c5c
+  contractsetup: validate
+  adjudicator: 0x7aBc0256Eb3717d8603897Af6d6702884335C1dB
+  assetholder: 0xB656931920c66d8d22C81Fad9650D3C1A47D2829
+  txTimeout: 300s
+  chainID: 42
