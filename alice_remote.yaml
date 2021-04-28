@@ -22,4 +22,4 @@ chain:
   adjudicator: 0xe72d67D4d7CB437D086445Be955385dD520Bfe11
   assetholder: 0xdBef3b9cf5B96C8302dBE2655FBa24D9D7529555
   txTimeout: 10s
-  chainID: 0x8bf17f3ea3a3
+  ID: 0x8bf17f3ea3a3

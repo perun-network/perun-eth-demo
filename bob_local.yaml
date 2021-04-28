@@ -22,5 +22,5 @@ chain:
   adjudicator: 0x079557d7549d7D44F4b00b51d2C532674129ed51
   assetholder: 0x923439be515b6A928cB9650d70000a9044e49E85
   txTimeout: 10s
-  chainID: 44010
+  ID: 44010
 
