@@ -1,25 +1,25 @@
-alias: alice
+alias: bob
 mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
-accountIndex: 0
+accountIndex: 1
 
 channel:
   timeout: 300s
-  fundTimeout: 300s
+  fundtimeout: 300s
   settleTimeout: 300s
   challengeDurationSec: 600
 
 node:
   ip: 0.0.0.0
-  port: 5750
+  port: 5751
   dialTimeout: 300s
   handleTimeout: 300s
   reconnectTimeout: 20s
-  persistencePath: /tmp/alice_database
+  persistencePath: /tmp/bob_database
 
 chain:
-  url: ws://172.107.242.118:8548
+  url: ws://127.0.0.1:8545
   txTimeout: 10s
-  ID: 0x8bf17f3ea3a3
+  ID: 1337
 
 contracts:
   deployment: validate
@@ -28,8 +28,8 @@ contracts:
   assets:
     ETH:
       type: eth
-      assetholder: 0x509fE9A1064347E1182842482eF5DF24f9603E4c
+      assetholder: 0x749D2cB17884896518D7f9dF3122C536b49e0185
     PerunToken:
       type: erc20
       address: 0x10a9e5f1C50f2324D6e0A33617EB2729a485dA77
-      assetholder: 0x43Ff5C2FEA0Ba4230C7Dbf5C4B46cFE71d6f9Bb0
+      assetholder: 0x509fE9A1064347E1182842482eF5DF24f9603E4c

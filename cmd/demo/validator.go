@@ -22,6 +22,13 @@ func valBal(input string) error {
 	return errors.Wrap(err, "parsing float")
 }
 
+func valAsset(input string) error {
+	if !backend.ExistsAsset(input) {
+		return errors.Errorf("unknown asset: %s", input)
+	}
+	return nil
+}
+
 func valString(input string) error {
 	if len(input) < 1 {
 		return errors.New("Empty string")

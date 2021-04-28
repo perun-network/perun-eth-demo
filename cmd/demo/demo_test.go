@@ -54,7 +54,8 @@ func nodeCmd(name string) (*Cmd, error) {
 const (
 	blockTime    = 5 * time.Second
 	numUpdates   = 25
-	ethUrl       = "ws://127.0.0.1:8545"
+	ethUrlL1     = "ws://127.0.0.1:8545"
+	ethUrlL2     = "ws://127.0.0.1:7545"
 	addressAlice = "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B"
 	addressBob   = "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E"
 )
@@ -75,7 +76,7 @@ func TestNodes(t *testing.T) {
 	time.Sleep(5 * time.Second) // Give Bob some time to initialize.
 
 	// Get the initial on-chain balances from Alice and Bob.
-	initBals, err := getOnChainBals()
+	initBals, err := getOnChainBals(ethUrlL1)
 	require.NoError(t, err)
 	t.Logf("Initial on-chain balances: Alice = %f, Bob = %f", initBals[0], initBals[1])
 
@@ -102,7 +103,7 @@ func TestNodes(t *testing.T) {
 	time.Sleep(2*blockTime + 5*time.Second)
 
 	// Get the final balances from Alice and Bob after the settlement.
-	finalBals, err := getOnChainBals()
+	finalBals, err := getOnChainBals(ethUrlL1)
 	require.NoError(t, err)
 
 	t.Logf("Final on-chain balances: Alice = %f, Bob = %f", finalBals[0], finalBals[1])
@@ -125,13 +126,13 @@ func (cmd *Cmd) sendCommand(str string) error {
 	return err
 }
 
-func getOnChainBals() ([2]*big.Float, error) {
+func getOnChainBals(url string) ([2]*big.Float, error) {
 	var bals [2]*big.Float
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	ethereumBackend, err := ethclient.Dial(ethUrl)
+	ethereumBackend, err := ethclient.Dial(url)
 	if err != nil {
 		return bals, errors.New("Could not connect to ethereum node.")
 	}

@@ -14,7 +14,7 @@ require (
 	github.com/magiconair/properties v1.8.4 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.1
-	github.com/mitchellh/mapstructure v1.4.0 // indirect
+	github.com/mitchellh/mapstructure v1.1.2
 	github.com/montanaflynn/stats v0.6.3
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/pelletier/go-toml v1.8.1 // indirect
@@ -34,3 +34,5 @@ require (
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	perun.network/go-perun v0.6.1-0.20210416103939-25e0d303ebf6
 )
+
+replace perun.network/go-perun => github.com/perun-network/go-perun v0.6.1-0.20210429083918-e7ee74d5a34f

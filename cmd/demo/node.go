@@ -6,6 +6,7 @@
 package demo
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -53,14 +54,13 @@ type node struct {
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
-	asset       channel.Asset
-	assetAddr   common.Address
+	assets      map[string]common.Address
 	funder      channel.Funder
 	// Needed to deploy contracts.
 	cb echannel.ContractBackend
 
 	// Protects peers
-	mtx   sync.Mutex
+	mtx   sync.RWMutex
 	peers map[string]*peer
 }
 
@@ -224,18 +224,32 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 
 func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalResponder) {
 	req, ok := prop.(*client.LedgerChannelProposal)
-	if !ok {
+	if !ok || (req.Valid() != nil) {
 		log.Fatal("Can handle only ledger channel proposals.")
 	}
-
 	if len(req.Peers) != 2 {
 		log.Fatal("Only channels with two participants are currently supported")
 	}
+	if len(req.Base().InitBals.Assets) != 1 {
+		log.Fatal("Only channels with one asset are currently supported")
+	}
+	_assetAddr, ok := req.Base().InitBals.Assets[0].(*echannel.Asset)
+	if !ok {
+		log.Fatal("Need ethereum asset")
+	}
+	assetAddr := common.Address(*_assetAddr)
 
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	id := req.Peers[0]
 	n.log.Debug("Received channel proposal")
+	// Check the asset
+	assetName, found := n.findAsset(assetAddr)
+	if !found {
+		reason := fmt.Sprintf("unknown asset: %s", assetAddr.Hex())
+		n.rejectProposal(res, reason)
+		return
+	}
 
 	// Find the peer by its perunID and create it if not present
 	p := n.peer(id)
@@ -243,11 +257,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 	if p == nil {
 		if cfg == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
-			defer cancel()
-			if err := res.Reject(ctx, "Unknown identity"); err != nil {
-				n.log.WithError(err).Warn("rejecting")
-			}
+			n.rejectProposal(res, "Unknown identity")
 			return
 		}
 		p = &peer{
@@ -261,9 +271,8 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	n.log.WithField("peer", id).Debug("Channel proposal")
 
 	bals := weiToEther(req.InitBals.Balances[0]...)
-	theirBal := bals[0] // proposer has index 0
-	ourBal := bals[1]   // proposal receiver has index 1
-	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with funding [My: %v Ξ, Peer: %v Ξ].\nAccept (y/n)? ", alias, ourBal, theirBal)
+	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with %s funding [My: %v, Peer: %v].\nAccept (y/n)? ", alias, assetName, ourBal, theirBal)
 	Prompt(msg, func(userInput string) {
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 		defer cancel()
@@ -297,11 +306,12 @@ func (n *node) Open(args []string) error {
 		}
 		peer = n.peers[peerName]
 	}
-	myBalEth, _ := new(big.Float).SetString(args[1]) // Input was already validated by command parser.
-	peerBalEth, _ := new(big.Float).SetString(args[2])
+	asset := n.assets[args[1]]
+	myBalEth, _ := new(big.Float).SetString(args[2]) // Input was already validated by command parser.
+	peerBalEth, _ := new(big.Float).SetString(args[3])
 
 	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{n.asset},
+		Assets:   []channel.Asset{(*echannel.Asset)(&asset)},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
 
@@ -329,6 +339,14 @@ func (n *node) Open(args []string) error {
 		return errors.New("OnNewChannel handler could not setup channel")
 	}
 	return nil
+}
+
+func (n *node) rejectProposal(res *client.ProposalResponder, reason string) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+	defer cancel()
+	if err := res.Reject(ctx, reason); err != nil {
+		n.log.WithError(err).Warn("rejecting")
+	}
 }
 
 func (n *node) Send(args []string) error {
@@ -426,8 +444,25 @@ func (n *node) Exit([]string) error {
 }
 
 func (n *node) ExistsPeer(alias string) bool {
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
+	n.mtx.RLock()
+	defer n.mtx.RUnlock()
 
 	return n.peers[alias] != nil
+}
+
+func (n *node) ExistsAsset(asset string) bool {
+	n.mtx.RLock()
+	defer n.mtx.RUnlock()
+
+	_, ok := n.assets[asset]
+	return ok
+}
+
+func (n *node) findAsset(addr common.Address) (string, bool) {
+	for name, asset := range n.assets {
+		if bytes.Equal(asset.Bytes(), addr.Bytes()) {
+			return name, true
+		}
+	}
+	return "", false
 }

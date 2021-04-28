@@ -18,9 +18,18 @@ node:
 
 chain:
   url: ws://172.107.242.118:8548
-  contractsetup: validate
-  adjudicator: 0xe72d67D4d7CB437D086445Be955385dD520Bfe11
-  assetholder: 0xdBef3b9cf5B96C8302dBE2655FBa24D9D7529555
   txTimeout: 10s
   ID: 0x8bf17f3ea3a3
 
+contracts:
+  deployment: validate
+  adjudicator: 0x4FB8637Afd28492A3209017556e95Dc2F8086ddb
+
+  assets:
+    ETH:
+      type: eth
+      assetholder: 0x509fE9A1064347E1182842482eF5DF24f9603E4c
+    PerunToken:
+      type: erc20
+      address: 0x10a9e5f1C50f2324D6e0A33617EB2729a485dA77
+      assetholder: 0x43Ff5C2FEA0Ba4230C7Dbf5C4B46cFE71d6f9Bb0

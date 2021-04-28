@@ -8,9 +8,11 @@ package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 import (
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
@@ -19,72 +21,81 @@ import (
 )
 
 // Config contains all configuration read from config.yaml and network.yaml
-type Config struct {
-	Alias        string
-	SecretKey    string
-	Mnemonic     string
-	AccountIndex uint
-	Channel      channelConfig
-	Node         nodeConfig
-	Chain        chainConfig
-	// Read from the network.yaml. The key is the alias.
-	Peers map[string]*netConfigEntry
-}
+type (
+	Config struct {
+		Alias        string
+		SecretKey    string
+		Mnemonic     string
+		AccountIndex uint
+		Channel      channelConfig
+		Node         nodeConfig
+		Chain        chainConfig
+		Contracts    contractsConfig
+		// Read from the network.yaml. The key is the alias.
+		Peers map[string]*netConfigEntry
+	}
 
-type channelConfig struct {
-	Timeout              time.Duration
-	FundTimeout          time.Duration
-	SettleTimeout        time.Duration
-	ChallengeDurationSec uint64
-}
+	channelConfig struct {
+		Timeout              time.Duration
+		FundTimeout          time.Duration
+		SettleTimeout        time.Duration
+		ChallengeDurationSec uint64
+	}
 
-type nodeConfig struct {
-	IP              string
-	Port            uint16
-	DialTimeout     time.Duration
-	HandleTimeout   time.Duration
-	ReconnecTimeout time.Duration
+	nodeConfig struct {
+		IP              string
+		Port            uint16
+		DialTimeout     time.Duration
+		HandleTimeout   time.Duration
+		ReconnecTimeout time.Duration
 
-	PersistencePath    string
-	PersistenceEnabled bool
-}
+		PersistencePath    string
+		PersistenceEnabled bool
+	}
 
-type contractSetupOption int
+	chainConfig struct {
+		TxTimeout time.Duration // timeout duration for on-chain transactions
+		URL       string        // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
+		ID        int64         // Chain ID
+	}
 
-var contractSetupOptions [3]string = [...]string{"validate", "deploy", "validateordeploy"}
+	contractsConfig struct {
+		Deployment deploymentOption
 
-const (
-	contractSetupOptionValidate contractSetupOption = iota
-	contractSetupOptionDeploy
-	contractSetupOptionValidateOrDeploy
+		Adjudicator common.Address
+		Assets      map[string]*assetConfig
+	}
+
+	assetConfig struct {
+		Type        string         `mapstructure:"type"`
+		Assetholder common.Address `mapstructure:"assetholder"`
+		Address     common.Address `mapstructure:"address"`
+	}
+
+	deploymentOption int
 )
 
-func (option contractSetupOption) String() string {
+var contractSetupOptions = [...]string{"validate", "deploy"}
+
+const (
+	contractSetupOptionValidate deploymentOption = iota
+	contractSetupOptionDeploy
+)
+
+func (option deploymentOption) String() string {
 	return contractSetupOptions[option]
 }
 
-func parseContractSetupOption(s string) (option contractSetupOption, err error) {
+func parseContractSetupOption(s string) (option deploymentOption, err error) {
 	for i, optionString := range contractSetupOptions {
 		if s == optionString {
-			option = contractSetupOption(i)
+			option = deploymentOption(i)
 			return
 		}
 	}
 
 	err = errors.New(fmt.Sprintf("Invalid value for config option 'contractsetup'. The value is '%s', but must be one of '%v'.", s, contractSetupOptions))
 	return
-}
-
-type chainConfig struct {
-	TxTimeout     time.Duration       // timeout duration for on-chain transactions
-	ContractSetup string              // contract setup method
-	contractSetup contractSetupOption //
-	Adjudicator   string              // address of adjudicator contract
-	adjudicator   common.Address      //
-	Assetholder   string              // address of asset holder contract
-	assetholder   common.Address      //
-	URL           string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
-	ID            int64               // Chain ID
 }
 
 type netConfigEntry struct {
@@ -115,25 +126,13 @@ func SetConfig() {
 		log.Fatalf("Error reading network config file, %s", err)
 	}
 
-	if err := viper.Unmarshal(&config); err != nil {
+	opts := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		parseEthAddress(),
+		mapstructure.StringToTimeDurationHookFunc(), // default
+		mapstructure.StringToSliceHookFunc(","),     // default
+	))
+	if err := viper.Unmarshal(&config, opts); err != nil {
 		log.Fatal(err)
-	}
-
-	var err error
-	if config.Chain.contractSetup, err = parseContractSetupOption(config.Chain.ContractSetup); err != nil {
-		log.Fatal(err)
-	}
-
-	if len(config.Chain.Adjudicator) > 0 {
-		if config.Chain.adjudicator, err = stringToAddress(config.Chain.Adjudicator); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	if len(config.Chain.Assetholder) > 0 {
-		if config.Chain.assetholder, err = stringToAddress(config.Chain.Assetholder); err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	for _, peer := range config.Peers {
@@ -142,6 +141,31 @@ func SetConfig() {
 			log.Panic(err)
 		}
 		peer.perunID = addr
+	}
+}
+
+func parseEthAddress() mapstructure.DecodeHookFunc {
+	return func(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+		// filter by *->common.Address
+		switch to {
+		case reflect.TypeOf(common.Address{}):
+			addr, ok := data.(string)
+			if !ok {
+				return nil, errors.New("expected a string for an address")
+			}
+			if len(addr) != 42 {
+				return nil, errors.New("ethereum address must be 42 characters long")
+			}
+			if !common.IsHexAddress(addr) {
+				return nil, errors.New("invalid ethereum address")
+			}
+			return common.HexToAddress(addr), nil
+		case reflect.TypeOf(deploymentOption(0)):
+			raw, _ := data.(string)
+			return parseContractSetupOption(raw)
+		default:
+			return data, nil
+		}
 	}
 }
 

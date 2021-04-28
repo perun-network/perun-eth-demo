@@ -18,8 +18,8 @@ node:
 
 chain:
   url: wss://kovan4.arbitrum.io/ws
-  contractsetup: deploy
+  contractsetup: validate
   adjudicator: 0x20e1D1642284AdB74520f0e91835bbc6d5ec3415
   assetholder: 0x3f6629d37E84E6Da88978198c9A1B228C5722085
   txTimeout: 300s
-  ID: 212984383488152
+  ID: 0xc1b54a854098

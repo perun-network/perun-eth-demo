@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -67,7 +68,7 @@ func newNode() (*node, error) {
 	if chainID.Cmp(configChainID) != 0 {
 		return nil, errors.New("Endpoint returned different chain ID: " + chainID.String())
 	}
-	signer := types.NewEIP155Signer(configChainID)
+	signer := types.NewEIP155Signer(big.NewInt(config.Chain.ID))
 
 	n := &node{
 		log:     log.Get(),
@@ -75,6 +76,7 @@ func newNode() (*node, error) {
 		wallet:  wallet,
 		dialer:  dialer,
 		cb:      echannel.NewContractBackend(ethereumBackend, phd.NewTransactor(wallet.Wallet(), signer)),
+		assets:  make(map[string]common.Address),
 		peers:   make(map[string]*peer),
 	}
 	return n, n.setup()
@@ -125,53 +127,72 @@ func (n *node) setup() error {
 }
 
 func (n *node) setupContracts() error {
-	var adjAddr common.Address
-	var assAddr common.Address
-	var err error
-
-	fmt.Println("💭 Validating contracts...")
-
-	switch contractSetup := config.Chain.contractSetup; contractSetup {
+	switch contractSetup := config.Contracts.Deployment; contractSetup {
 	case contractSetupOptionValidate:
-		if adjAddr, err = validateAdjudicator(n.cb); err == nil { // validate adjudicator
-			assAddr, err = validateAssetHolder(n.cb, adjAddr) // validate asset holder
+		adjAddr := config.Contracts.Adjudicator
+		// Validate adjudicator
+		if err := validateAdjudicator(n.cb, adjAddr); err != nil {
+			return errors.WithMessage(err, "validating adjudicator")
+		}
+		n.adjAddr = adjAddr
+
+		// Validate all AssetHolders
+		for name, asset := range config.Contracts.Assets {
+			var err error
+			switch strings.ToLower(asset.Type) {
+			case "eth":
+				err = validateAssetHolderETH(n.cb, adjAddr, asset.Assetholder)
+			case "erc20":
+				err = validateAssetHolderERC20(n.cb, adjAddr, asset.Assetholder, asset.Address)
+			default:
+				err = errors.Errorf("invalid asset type: %s", asset.Type)
+			}
+			if err != nil {
+				return errors.WithMessagef(err, "validating asset: %s", name)
+			}
+			n.assets[name] = asset.Assetholder
 		}
 	case contractSetupOptionDeploy:
-		if adjAddr, err = deployAdjudicator(n.cb, n.onChain.Account); err == nil { // deploy adjudicator
-			assAddr, err = deployAssetHolder(n.cb, adjAddr, n.onChain.Account) // deploy asset holder
+		// Deploy Adjudicator
+		adjAddr, err := deployAdjudicator(n.cb, n.onChain.Account)
+		if err != nil {
+			return errors.WithMessage(err, "deploying adjudicator")
 		}
-	case contractSetupOptionValidateOrDeploy:
-		if adjAddr, err = validateAdjudicator(n.cb); err != nil { // validate adjudicator
-			fmt.Println("❌ Adjudicator invalid")
-			adjAddr, err = deployAdjudicator(n.cb, n.onChain.Account) // deploy adjudicator
-		}
+		n.adjAddr = adjAddr
 
-		if err == nil {
-			if assAddr, err = validateAssetHolder(n.cb, adjAddr); err != nil { // validate asset holder
-				fmt.Println("❌ Asset holder invalid")
-				assAddr, err = deployAssetHolder(n.cb, adjAddr, n.onChain.Account) // deploy asset holder
+		// Deploy all AssetHolders
+		for name, asset := range config.Contracts.Assets {
+			var err error
+			var ahAddr common.Address
+
+			switch strings.ToLower(asset.Type) {
+			case "eth":
+				ahAddr, err = deployAssetHolderETH(n.cb, n.onChain.Account, adjAddr)
+			case "erc20":
+				ahAddr, err = deployAssetHolderERC20(n.cb, n.onChain.Account, adjAddr, asset.Address)
+			default:
+				err = errors.Errorf("invalid asset type: %s", asset.Type)
 			}
+			if err != nil {
+				return errors.WithMessagef(err, "validating asset: %s", name)
+			}
+			n.assets[name] = ahAddr
 		}
 	default:
-		// unsupported setup method
-		err = errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
+		return errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
 	}
 
 	fmt.Println("✅ Contracts validated.")
 
-	if err != nil {
-		return errors.WithMessage(err, "contract setup failed")
+	withdrawAddr := ewallet.AsEthAddr(n.onChain.Address())
+	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, withdrawAddr, n.onChain.Account)
+
+	accounts := make(map[echannel.Asset]accounts.Account)
+	depositors := make(map[echannel.Asset]echannel.Depositor)
+	for _, asset := range n.assets {
+		accounts[ewallet.Address(asset)] = n.onChain.Account
+		depositors[ewallet.Address(asset)] = new(echannel.ETHDepositor)
 	}
-
-	n.adjAddr = adjAddr
-	n.assetAddr = assAddr
-	recvAddr := ewallet.AsEthAddr(n.onChain.Address())
-	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, recvAddr, n.onChain.Account)
-	n.asset = (*ewallet.Address)(&n.assetAddr)
-	n.log.WithField("Adj", n.adjAddr).WithField("Asset", n.assetAddr).Debug("Set contracts")
-
-	accounts := map[echannel.Asset]accounts.Account{ewallet.Address(n.assetAddr): n.onChain.Account}
-	depositors := map[echannel.Asset]echannel.Depositor{ewallet.Address(n.assetAddr): new(echannel.ETHDepositor)}
 	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
 
 	return nil
@@ -199,20 +220,28 @@ func (n *node) setupPersistence() error {
 	return nil
 }
 
-func validateAdjudicator(cb echannel.ContractBackend) (common.Address, error) {
+func validateAdjudicator(cb echannel.ContractBackend, adjAddr common.Address) error {
+	fmt.Println("💭 Validating Adjudicator at: ", adjAddr.Hex())
 	ctx, cancel := newTransactionContext()
 	defer cancel()
 
-	adjAddr := config.Chain.adjudicator
-	return adjAddr, echannel.ValidateAdjudicator(ctx, cb, adjAddr)
+	return echannel.ValidateAdjudicator(ctx, cb, adjAddr)
 }
 
-func validateAssetHolder(cb echannel.ContractBackend, adjAddr common.Address) (common.Address, error) {
+func validateAssetHolderETH(cb echannel.ContractBackend, adjAddr, assAddr common.Address) error {
+	fmt.Println("💭 Validating AssetholderETH at: ", assAddr)
 	ctx, cancel := newTransactionContext()
 	defer cancel()
 
-	assAddr := config.Chain.assetholder
-	return assAddr, echannel.ValidateAssetHolderETH(ctx, cb, assAddr, adjAddr)
+	return echannel.ValidateAssetHolderETH(ctx, cb, assAddr, adjAddr)
+}
+
+func validateAssetHolderERC20(cb echannel.ContractBackend, adjAddr, assAddr, token common.Address) error {
+	fmt.Println("💭 Validating AssetholderERC20 at: ", assAddr)
+	ctx, cancel := newTransactionContext()
+	defer cancel()
+
+	return echannel.ValidateAdjudicator(ctx, cb, adjAddr)
 }
 
 // deployAdjudicator deploys the Adjudicator to the blockchain and returns its address
@@ -227,11 +256,19 @@ func deployAdjudicator(cb echannel.ContractBackend, acc accounts.Account) (commo
 
 // deployAssetHolder deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
-func deployAssetHolder(cb echannel.ContractBackend, adjudicator common.Address, acc accounts.Account) (common.Address, error) {
+func deployAssetHolderETH(cb echannel.ContractBackend, acc accounts.Account, adjudicator common.Address) (common.Address, error) {
 	fmt.Println("🌐 Deploying asset holder")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator, acc)
+	return asset, errors.WithMessage(err, "deploying eth assetholder")
+}
+
+func deployAssetHolderERC20(cb echannel.ContractBackend, acc accounts.Account, adjudicator, tokenAddr common.Address) (common.Address, error) {
+	fmt.Println("🌐 Deploying asset holder")
+	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
+	defer cancel()
+	asset, err := echannel.DeployERC20Assetholder(ctx, cb, adjudicator, tokenAddr, acc)
 	return asset, errors.WithMessage(err, "deploying eth assetholder")
 }
 
@@ -268,7 +305,7 @@ func (n *node) PrintConfig() error {
 			"OffChain: %s\n"+
 			"ETHAssetHolder: %s\n"+
 			"Adjudicator: %s\n"+
-			"", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), n.assetAddr.String(), n.adjAddr.String())
+			"", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), "FIXME", n.adjAddr.String())
 
 	fmt.Println("Known peers:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.TabIndent)
