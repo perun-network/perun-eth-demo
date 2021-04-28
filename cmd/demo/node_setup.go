@@ -56,7 +56,18 @@ func newNode() (*node, error) {
 		return nil, errors.WithMessage(err, "importing mnemonic")
 	}
 	dialer := simple.NewTCPDialer(config.Node.DialTimeout)
-	signer := types.NewEIP155Signer(big.NewInt(config.Chain.ID))
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+	defer cancel()
+	chainID, err := ethereumBackend.NetworkID(ctx)
+	if err != nil {
+		return nil, errors.WithMessage(err, "checking chainID")
+	}
+	configChainID := big.NewInt(config.Chain.ID)
+	if chainID.Cmp(configChainID) != 0 {
+		return nil, errors.New("Endpoint returned different chain ID: " + chainID.String())
+	}
+	signer := types.NewEIP155Signer(configChainID)
 
 	n := &node{
 		log:     log.Get(),
