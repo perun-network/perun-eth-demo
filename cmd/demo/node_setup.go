@@ -68,7 +68,7 @@ func newNode() (*node, error) {
 	if chainID.Cmp(configChainID) != 0 {
 		return nil, errors.New("Endpoint returned different chain ID: " + chainID.String())
 	}
-	signer := types.NewEIP155Signer(big.NewInt(config.Chain.ID))
+	signer := types.NewEIP155Signer(configChainID)
 
 	n := &node{
 		log:     log.Get(),
@@ -191,7 +191,7 @@ func (n *node) setupContracts() error {
 	depositors := make(map[echannel.Asset]echannel.Depositor)
 	for _, asset := range n.assets {
 		accounts[ewallet.Address(asset)] = n.onChain.Account
-		depositors[ewallet.Address(asset)] = new(echannel.ETHDepositor)
+		depositors[ewallet.Address(asset)] = &echannel.ERC20Depositor{Token: asset}
 	}
 	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
 

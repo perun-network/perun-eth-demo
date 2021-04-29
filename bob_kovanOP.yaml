@@ -18,11 +18,21 @@ node:
 
 chain:
   url: wss://ws-kovan.optimism.io
-  contractsetup: validate
-  adjudicator: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
-  assetholder: 0x9234dA41452633e6Ec1660B7398e925222752a8D
   txTimeout: 30s
   ID: 1337
+
+contracts:
+  deployment: validate
+  adjudicator: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
+
+  assets:
+    ETH:
+      type: eth
+      assetholder: 0x749D2cB17884896518D7f9dF3122C536b49e0185
+    PerunToken:
+      type: erc20
+      address: 0xB55689b7AD3cA3ea340de5465724452cb5bcC556
+      assetholder: 0x5C74C5888FF77AeFbbEF793D766dc7c2767cb441
 
 log:
   level: warn
