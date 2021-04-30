@@ -35,4 +35,6 @@ require (
 	perun.network/go-perun v0.6.1-0.20210416103939-25e0d303ebf6
 )
 
-replace perun.network/go-perun => github.com/perun-network/go-perun v0.6.1-0.20210429083918-e7ee74d5a34f
+//replace perun.network/go-perun => github.com/perun-network/go-perun v0.6.1-0.20210429083918-e7ee74d5a34f
+
+replace perun.network/go-perun => ../go-perun
