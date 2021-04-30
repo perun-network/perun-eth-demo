@@ -60,7 +60,7 @@ func newNode() (*node, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 	defer cancel()
-	chainID, err := ethereumBackend.NetworkID(ctx)
+	chainID, err := ethereumBackend.ChainID(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "checking chainID")
 	}
@@ -261,7 +261,7 @@ func deployAdjudicator(cb echannel.ContractBackend, acc accounts.Account) (commo
 // deployAssetHolder deploys the Assetholder to the blockchain and returns its address
 // or an error. Needs an Adjudicator address as second argument.
 func deployAssetHolderETH(cb echannel.ContractBackend, acc accounts.Account, adjudicator common.Address) (common.Address, error) {
-	fmt.Println("🌐 Deploying asset holder")
+	fmt.Println("🌐 Deploying asset holder ETH")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployETHAssetholder(ctx, cb, adjudicator, acc)
@@ -269,7 +269,7 @@ func deployAssetHolderETH(cb echannel.ContractBackend, acc accounts.Account, adj
 }
 
 func deployAssetHolderERC20(cb echannel.ContractBackend, acc accounts.Account, adjudicator, tokenAddr common.Address) (common.Address, error) {
-	fmt.Println("🌐 Deploying asset holder")
+	fmt.Println("🌐 Deploying asset holder ERC20")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	asset, err := echannel.DeployERC20Assetholder(ctx, cb, adjudicator, tokenAddr, acc)

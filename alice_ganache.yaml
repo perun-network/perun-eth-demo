@@ -1,6 +1,6 @@
-alias: bob
+alias: alice
 mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
-accountIndex: 1
+accountIndex: 0
 
 channel:
   timeout: 30s
@@ -10,11 +10,11 @@ channel:
 
 node:
   ip: 0.0.0.0
-  port: 5751
+  port: 5750
   dialTimeout: 300s
   handleTimeout: 300s
   reconnectTimeout: 20s
-  persistencePath: /tmp/bob_database
+  persistencePath: /tmp/alice_database
 
 chain:
   url: ws://127.0.0.1:8545
@@ -22,7 +22,7 @@ chain:
   ID: 1337
 
 contracts:
-  deployment: validate
+  deployment: deploy
   adjudicator: 0x079557d7549d7D44F4b00b51d2C532674129ed51
 
   assets:
