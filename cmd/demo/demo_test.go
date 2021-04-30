@@ -81,7 +81,7 @@ func TestNodes(t *testing.T) {
 	t.Logf("Initial on-chain balances: Alice = %f, Bob = %f", initBals[0], initBals[1])
 
 	// Alice opens channel with Bob.
-	require.NoError(t, alice.sendCommand("open bob 100 100\n"), "proposing channel")
+	require.NoError(t, alice.sendCommand("open bob eth 100 100\n"), "proposing channel")
 	time.Sleep(3 * time.Second) // Ensure that Bob really received the proposal.
 	require.NoError(t, bob.sendCommand("y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")

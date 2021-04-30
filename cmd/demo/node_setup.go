@@ -127,6 +127,8 @@ func (n *node) setup() error {
 }
 
 func (n *node) setupContracts() error {
+	depositors := make(map[echannel.Asset]echannel.Depositor)
+
 	switch contractSetup := config.Contracts.Deployment; contractSetup {
 	case contractSetupOptionValidate:
 		adjAddr := config.Contracts.Adjudicator
@@ -142,8 +144,10 @@ func (n *node) setupContracts() error {
 			switch strings.ToLower(asset.Type) {
 			case "eth":
 				err = validateAssetHolderETH(n.cb, adjAddr, asset.Assetholder)
+				depositors[ewallet.Address(asset.Assetholder)] = new(echannel.ETHDepositor)
 			case "erc20":
 				err = validateAssetHolderERC20(n.cb, adjAddr, asset.Assetholder, asset.Address)
+				depositors[ewallet.Address(asset.Assetholder)] = &echannel.ERC20Depositor{Token: asset.Address}
 			default:
 				err = errors.Errorf("invalid asset type: %s", asset.Type)
 			}
@@ -168,8 +172,10 @@ func (n *node) setupContracts() error {
 			switch strings.ToLower(asset.Type) {
 			case "eth":
 				ahAddr, err = deployAssetHolderETH(n.cb, n.onChain.Account, adjAddr)
+				depositors[ewallet.Address(ahAddr)] = new(echannel.ETHDepositor)
 			case "erc20":
 				ahAddr, err = deployAssetHolderERC20(n.cb, n.onChain.Account, adjAddr, asset.Address)
+				depositors[ewallet.Address(ahAddr)] = &echannel.ERC20Depositor{Token: ahAddr}
 			default:
 				err = errors.Errorf("invalid asset type: %s", asset.Type)
 			}
@@ -188,10 +194,8 @@ func (n *node) setupContracts() error {
 	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, withdrawAddr, n.onChain.Account)
 
 	accounts := make(map[echannel.Asset]accounts.Account)
-	depositors := make(map[echannel.Asset]echannel.Depositor)
 	for _, asset := range n.assets {
 		accounts[ewallet.Address(asset)] = n.onChain.Account
-		depositors[ewallet.Address(asset)] = &echannel.ERC20Depositor{Token: asset}
 	}
 	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
 
@@ -303,9 +307,11 @@ func (n *node) PrintConfig() error {
 			"ETH RPC URL: %s\n"+
 			"Perun ID: %s\n"+
 			"OffChain: %s\n"+
-			"ETHAssetHolder: %s\n"+
 			"Adjudicator: %s\n"+
-			"", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), "FIXME", n.adjAddr.String())
+			"Assets:\n", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), n.adjAddr.String())
+	for name, asset := range n.assets {
+		fmt.Printf("\t%s at %s\n", name, asset.Hex())
+	}
 
 	fmt.Println("Known peers:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.TabIndent)
