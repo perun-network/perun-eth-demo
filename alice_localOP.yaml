@@ -4,9 +4,9 @@ accountIndex: 0
 
 channel:
   timeout: 30s
-  fundtimeout: 30s
+  fundTimeout: 60s
   settleTimeout: 30s
-  challengeDurationSec: 600
+  challengeDurationSec: 60
 
 node:
   ip: 0.0.0.0
@@ -17,19 +17,23 @@ node:
   persistencePath: /tmp/alice_database
 
 chain:
-  url: ws://172.107.242.118:8548
-  txTimeout: 15s
-  ID: 0x8bf17f3ea3a3
+  url: ws://127.0.0.1:8546
+  txTimeout: 30s
+  ID: 420
 
 contracts:
   deployment: validate
-  adjudicator: 0x749D2cB17884896518D7f9dF3122C536b49e0185
+  adjudicator: 0x923439be515b6A928cB9650d70000a9044e49E85
 
   assets:
     ETH:
       type: eth
-      assetholder: 0x3f5AfF66D8222c593a66D10c87f7030B9e2646b7
+      assetholder: 0xe72d67D4d7CB437D086445Be955385dD520Bfe11
     PerunToken:
       type: erc20
-      address: 0x8A050Ddb3d30845544bb3eA82Dd343ba4090eb07
-      assetholder: 0x509fE9A1064347E1182842482eF5DF24f9603E4c
+      address: 0xdBef3b9cf5B96C8302dBE2655FBa24D9D7529555
+      assetholder: 0xb5c37Ee9C816D2DB2f6A9A020ce6a80af3993AD3
+
+log:
+  level: warn
+  file: "alice.log"
