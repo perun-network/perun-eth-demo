@@ -4,7 +4,7 @@ accountIndex: 1
 
 channel:
   timeout: 300s
-  fundTimeout: 30s
+  fundTimeout: 300s
   settleTimeout: 300s
   challengeDurationSec: 600
 
@@ -17,19 +17,19 @@ node:
   persistencePath: /tmp/bob_database
 
 chain:
-  url: ws://172.107.242.118:8548
-  txTimeout: 60s
-  ID: 0x8bf17f3ea3a3
+  url: wss://kovan4.arbitrum.io/ws
+  txTimeout: 300s
+  ID: 0xc1b54a854098
 
 contracts:
   deployment: validate
-  adjudicator: 0xb00C0f59A68Ff779838d6D92fb4e39400cC76ADD
+  adjudicator: 0x52CdC85eF953c8C9177eA75fe1A8F0890B80B9dD
 
   assets:
     ETH:
       type: eth
-      assetholder: 0x6e8C10041394b49Ca0785b7A9aAC6EdF476eC256
+      assetholder: 0x97a5500E0d510D9d2ca52157667262573259f00F
     PerunToken:
       type: erc20
-      address: 0xf75605Fe9695d85Aa3D66ECB5dd09224b613c38B
-      assetholder: 0x63Cd5b35728B44E14f132366407756bE0046cA68
+      address: 0xa971a7bDC39628990cB0Ac953A7D9880c38FD33B
+      assetholder: 0x87f4A54b030d8Aeb8BdEEC9F3e0888159423B894

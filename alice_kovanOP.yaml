@@ -1,0 +1,29 @@
+alias: alice
+mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
+accountIndex: 0
+
+channel:
+  timeout: 30s
+  fundTimeout: 30s
+  settleTimeout: 30s
+  challengeDurationSec: 60
+
+node:
+  ip: 0.0.0.0
+  port: 5750
+  dialTimeout: 30s
+  handleTimeout: 30s
+  reconnectTimeout: 20s
+  persistencePath: /tmp/alice_database
+
+chain:
+  url: wss://ws-kovan.optimism.io
+  contractsetup: validateordeploy
+  adjudicator: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
+  assetholder: 0x9234dA41452633e6Ec1660B7398e925222752a8D
+  txTimeout: 30s
+  ID: 1337
+
+log:
+  level: warn
+  file: "alice.log"

@@ -1,0 +1,35 @@
+alias: alice
+mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
+accountIndex: 0
+
+channel:
+  timeout: 300s
+  fundTimeout: 300s
+  settleTimeout: 300s
+  challengeDurationSec: 600
+
+node:
+  ip: 0.0.0.0
+  port: 5750
+  dialTimeout: 300s
+  handleTimeout: 300s
+  reconnectTimeout: 20s
+  persistencePath: /tmp/alice_database
+
+chain:
+  url: wss://kovan4.arbitrum.io/ws
+  txTimeout: 300s
+  ID: 0xc1b54a854098
+
+contracts:
+  deployment: validate
+  adjudicator: 0x52CdC85eF953c8C9177eA75fe1A8F0890B80B9dD
+
+  assets:
+    ETH:
+      type: eth
+      assetholder: 0x97a5500E0d510D9d2ca52157667262573259f00F
+    PerunToken:
+      type: erc20
+      address: 0xa971a7bDC39628990cB0Ac953A7D9880c38FD33B
+      assetholder: 0x87f4A54b030d8Aeb8BdEEC9F3e0888159423B894
