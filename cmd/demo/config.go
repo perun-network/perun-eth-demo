@@ -6,92 +6,74 @@
 package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 import (
-	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	ewallet "perun.network/go-perun/backend/ethereum/wallet"
-	"perun.network/go-perun/wallet"
-	"perun.network/go-perun/wire"
 )
 
 // Config contains all configuration read from config.yaml and network.yaml
-type Config struct {
-	Alias        string
-	SecretKey    string
-	Mnemonic     string
-	AccountIndex uint
-	Channel      channelConfig
-	Node         nodeConfig
-	Chain        chainConfig
-	// Read from the network.yaml. The key is the alias.
-	Peers map[string]*netConfigEntry
-}
-
-type channelConfig struct {
-	Timeout              time.Duration
-	FundTimeout          time.Duration
-	SettleTimeout        time.Duration
-	ChallengeDurationSec uint64
-}
-
-type nodeConfig struct {
-	IP              string
-	Port            uint16
-	DialTimeout     time.Duration
-	HandleTimeout   time.Duration
-	ReconnecTimeout time.Duration
-
-	PersistencePath    string
-	PersistenceEnabled bool
-}
-
-type contractSetupOption int
-
-var contractSetupOptions [3]string = [...]string{"validate", "deploy", "validateordeploy"}
-
-const (
-	contractSetupOptionValidate contractSetupOption = iota
-	contractSetupOptionDeploy
-	contractSetupOptionValidateOrDeploy
-)
-
-func (option contractSetupOption) String() string {
-	return contractSetupOptions[option]
-}
-
-func parseContractSetupOption(s string) (option contractSetupOption, err error) {
-	for i, optionString := range contractSetupOptions {
-		if s == optionString {
-			option = contractSetupOption(i)
-			return
-		}
+type (
+	Config struct {
+		Alias        string
+		SecretKey    string
+		Mnemonic     string
+		AccountIndex uint
+		Channel      channelConfig
+		Node         nodeConfig
+		Chain        chainConfig
+		Contracts    contractConfig
+		// Read from the network.yaml. The key is the alias.
+		Peers map[string]*netConfigEntry
 	}
 
-	err = errors.New(fmt.Sprintf("Invalid value for config option 'contractsetup'. The value is '%s', but must be one of '%v'.", s, contractSetupOptions))
-	return
-}
+	channelConfig struct {
+		Timeout              time.Duration
+		FundTimeout          time.Duration
+		SettleTimeout        time.Duration
+		ChallengeDurationSec uint64
+	}
 
-type chainConfig struct {
-	TxTimeout     time.Duration       // timeout duration for on-chain transactions
-	ContractSetup string              // contract setup method
-	contractSetup contractSetupOption //
-	Adjudicator   string              // address of adjudicator contract
-	adjudicator   common.Address      //
-	Assetholder   string              // address of asset holder contract
-	assetholder   common.Address      //
-	URL           string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
-}
+	nodeConfig struct {
+		IP              string
+		Port            uint16
+		DialTimeout     time.Duration
+		HandleTimeout   time.Duration
+		ReconnecTimeout time.Duration
 
-type netConfigEntry struct {
-	PerunID  string
-	perunID  wire.Address
-	Hostname string
-	Port     uint16
-}
+		PersistencePath    string
+		PersistenceEnabled bool
+	}
+
+	chainConfig struct {
+		TxTimeout time.Duration // timeout duration for on-chain transactions
+		URL       string        // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
+		ID        int64         // Chain ID
+	}
+
+	contractConfig struct {
+		Deployment deploymentOption
+
+		Adjudicator common.Address
+		Assets      map[string]*assetConfig
+	}
+
+	assetConfig struct {
+		Type        assetType      `mapstructure:"type"`
+		Assetholder common.Address `mapstructure:"assetholder"`
+		Address     common.Address `mapstructure:"address"`
+	}
+
+	netConfigEntry struct {
+		PerunID  common.Address
+		Hostname string
+		Port     uint16
+	}
+)
 
 var config Config
 
@@ -114,43 +96,46 @@ func SetConfig() {
 		log.Fatalf("Error reading network config file, %s", err)
 	}
 
-	if err := viper.Unmarshal(&config); err != nil {
+	opts := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		parseEthAddress(),
+		mapstructure.StringToTimeDurationHookFunc(), // default
+		mapstructure.StringToSliceHookFunc(","),     // default
+	))
+	if err := viper.Unmarshal(&config, opts); err != nil {
 		log.Fatal(err)
-	}
-
-	var err error
-	if config.Chain.contractSetup, err = parseContractSetupOption(config.Chain.ContractSetup); err != nil {
-		log.Fatal(err)
-	}
-
-	if len(config.Chain.Adjudicator) > 0 {
-		if config.Chain.adjudicator, err = stringToAddress(config.Chain.Adjudicator); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	if len(config.Chain.Assetholder) > 0 {
-		if config.Chain.assetholder, err = stringToAddress(config.Chain.Assetholder); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	for _, peer := range config.Peers {
-		addr, err := strToAddress(peer.PerunID)
-		if err != nil {
-			log.Panic(err)
-		}
-		peer.perunID = addr
 	}
 }
 
-func stringToAddress(s string) (common.Address, error) {
-	var err error
-	var walletAddr wallet.Address
-
-	if walletAddr, err = strToAddress(s); err != nil {
-		return common.Address{}, err
+// parseEthAddress is used by viper to parse the custom types out of the yaml struct.
+func parseEthAddress() mapstructure.DecodeHookFunc {
+	return func(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+		switch to {
+		case reflect.TypeOf(common.Address{}):
+			addr, ok := data.(string)
+			if !ok {
+				return nil, errors.New("expected a string for an address")
+			}
+			if len(addr) != 42 {
+				return nil, errors.New("ethereum address must be 42 characters long")
+			}
+			if !common.IsHexAddress(addr) {
+				return nil, errors.New("invalid ethereum address")
+			}
+			return common.HexToAddress(addr), nil
+		case reflect.TypeOf(deploymentOption(0)):
+			return parseContractSetupOption(data.(string))
+		case reflect.TypeOf(assetType(0)):
+			return parseAssetType(data.(string))
+		default:
+			return data, nil
+		}
 	}
+}
 
-	return ewallet.AsEthAddr(walletAddr), nil
+func (c Config) peerAddresses() []common.Address {
+	addrs := make([]common.Address, 0)
+	for _, peer := range c.Peers {
+		addrs = append(addrs, peer.PerunID)
+	}
+	return addrs
 }
