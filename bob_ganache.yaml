@@ -28,8 +28,8 @@ contracts:
   assets:
     ETH:
       type: eth
-      assetholder: 0xe72d67D4d7CB437D086445Be955385dD520Bfe11
+      assetholder: 0x923439be515b6A928cB9650d70000a9044e49E85
     PerunToken:
       type: erc20
-      address: 0xE59e4bD5d9e32C809Cac634Bd23F32966BB277a3
-      assetholder: 0x923439be515b6A928cB9650d70000a9044e49E85
+      address: 0x030B64Bb22FadA2d746a6BB1C9DD19E7C2c4E515
+      assetholder: 0xe72d67D4d7CB437D086445Be955385dD520Bfe11

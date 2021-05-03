@@ -184,6 +184,11 @@ func (n *node) setupContracts() error {
 			}
 			n.assets[name] = ahAddr
 		}
+
+		fmt.Printf("Adj addr %s\n", adjAddr)
+		fmt.Printf("AssetHoldereth addr %s\n", n.assets["eth"])
+		fmt.Printf("AssetHoldererc20 addr %s\n", n.assets["peruntoken"])
+
 	default:
 		return errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
 	}
@@ -228,7 +233,8 @@ func validateAdjudicator(cb echannel.ContractBackend, adjAddr common.Address) er
 	fmt.Println("💭 Validating Adjudicator at: ", adjAddr.Hex())
 	ctx, cancel := newTransactionContext()
 	defer cancel()
-
+	// Do not validate the Adjudicator.
+	return nil
 	return echannel.ValidateAdjudicator(ctx, cb, adjAddr)
 }
 
@@ -236,7 +242,8 @@ func validateAssetHolderETH(cb echannel.ContractBackend, adjAddr, assAddr common
 	fmt.Println("💭 Validating AssetholderETH at: ", assAddr)
 	ctx, cancel := newTransactionContext()
 	defer cancel()
-
+	// Do not validate the AssetHolderETH.
+	return nil
 	return echannel.ValidateAssetHolderETH(ctx, cb, assAddr, adjAddr)
 }
 
@@ -244,7 +251,8 @@ func validateAssetHolderERC20(cb echannel.ContractBackend, adjAddr, assAddr, tok
 	fmt.Println("💭 Validating AssetholderERC20 at: ", assAddr)
 	ctx, cancel := newTransactionContext()
 	defer cancel()
-
+	// Do not validate the AssetHolderERC20.
+	return nil
 	return echannel.ValidateAdjudicator(ctx, cb, adjAddr)
 }
 

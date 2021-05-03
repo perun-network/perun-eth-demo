@@ -4,7 +4,7 @@ accountIndex: 0
 
 channel:
   timeout: 30s
-  fundTimeout: 30s
+  fundTimeout: 60s
   settleTimeout: 30s
   challengeDurationSec: 60
 
@@ -19,7 +19,7 @@ node:
 chain:
   url: wss://ws-kovan.optimism.io
   txTimeout: 30s
-  ID: 1337
+  ID: 69
 
 contracts:
   deployment: validate

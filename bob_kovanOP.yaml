@@ -19,7 +19,7 @@ node:
 chain:
   url: wss://ws-kovan.optimism.io
   txTimeout: 30s
-  ID: 1337
+  ID: 69
 
 contracts:
   deployment: validate
