@@ -160,27 +160,27 @@ func (n *node) setupContracts() error {
 		}
 	case contractSetupOptionDeploy:
 		// Deploy Adjudicator
-		adjAddr, err := deployAdjudicator(n.cb, n.onChain.Account)
+		var err error
+		config.Contracts.Adjudicator, err = deployAdjudicator(n.cb, n.onChain.Account)
 		if err != nil {
 			return errors.WithMessage(err, "deploying adjudicator")
 		}
-		n.adjAddr = adjAddr
+		n.adjAddr = config.Contracts.Adjudicator
 
 		// Deploy all AssetHolders
 		for name, asset := range config.Contracts.Assets {
 			var err error
-			var ahAddr common.Address
 
 			switch asset.Type {
 			case assetTypeEth:
-				ahAddr, err = deployAssetHolderETH(n.cb, n.onChain.Account, adjAddr)
-				depositors[ewallet.Address(ahAddr)] = new(echannel.ETHDepositor)
+				asset.Assetholder, err = deployAssetHolderETH(n.cb, n.onChain.Account, n.adjAddr)
+				depositors[ewallet.Address(asset.Assetholder)] = new(echannel.ETHDepositor)
 			case assetTypeErc20:
 				// Prefund all peers from the network config with ERC20 tokens.
 				asset.Address, err = deployPerunToken(n.cb, n.onChain.Account, config.peerAddresses()...)
 				if err == nil {
-					ahAddr, err = deployAssetHolderERC20(n.cb, n.onChain.Account, adjAddr, asset.Address)
-					depositors[ewallet.Address(ahAddr)] = &echannel.ERC20Depositor{Token: ahAddr}
+					asset.Assetholder, err = deployAssetHolderERC20(n.cb, n.onChain.Account, n.adjAddr, asset.Address)
+					depositors[ewallet.Address(asset.Assetholder)] = &echannel.ERC20Depositor{Token: asset.Assetholder}
 				}
 			default:
 				err = errors.Errorf("invalid asset type: %s", asset.Type)
@@ -188,7 +188,6 @@ func (n *node) setupContracts() error {
 			if err != nil {
 				return errors.WithMessagef(err, "validating asset: %s", name)
 			}
-			n.assets[name] = ahAddr
 		}
 	default:
 		return errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
@@ -294,7 +293,7 @@ func deployPerunToken(cb echannel.ContractBackend, acc accounts.Account, prefund
 	fmt.Println("🌐 Deploying perun token")
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
-	initBal, _ := new(big.Int).SetString("100000000000000000000000000", 10)
+	initBal, _ := new(big.Int).SetString("1000000000000000000000", 10)
 	asset, err := echannel.DeployPerunToken(ctx, cb, acc, prefunded, initBal)
 	return asset, errors.WithMessage(err, "deploying perun token")
 }
