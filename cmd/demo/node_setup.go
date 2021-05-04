@@ -64,7 +64,7 @@ func newNode() (*node, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 	defer cancel()
-	chainID, err := ethereumBackend.NetworkID(ctx)
+	chainID, err := ethereumBackend.ChainID(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "checking chainID")
 	}
