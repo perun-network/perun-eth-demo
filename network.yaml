@@ -23,6 +23,13 @@ chains:
     GasLimit: 6600000
     GasPrice: -1
 
+  ganache:          # Local ganache
+    url: ws://127.0.0.1:8545
+    txTimeout: 30s
+    ID: 1620141566652
+    GasLimit: 6600000
+    GasPrice: -1
+
   kovan:            # Kovan L1 public test-net
     url: wss://kovan.infura.io/ws/v3/f95c9b7131cb4912b43aca853bfe3c5c
     txTimeout: 60s
@@ -38,7 +45,7 @@ chains:
     GasPrice: -1
 
   arbitrum_local:   # Arbitrum L2 self hosted test-net
-    url: ws://172.107.242.118:8548
+    url: ws://127.0.0.1:8548
     txTimeout: 60s
     ID: 0x8bf17f3ea3a3
     GasLimit: 66000000
@@ -52,7 +59,7 @@ chains:
     GasPrice: 0
   
   optimism_local:   # Optimism L2 self hosted test-net
-    url: ws://172.107.242.118:8546
+    url: ws://127.0.0.1:8546
     txTimeout: 30s
     ID: 420
     GasLimit: 8999999
