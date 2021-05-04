@@ -6,7 +6,11 @@
 package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -124,6 +128,21 @@ func parseEthAddress() mapstructure.DecodeHookFunc {
 			if !ok {
 				return nil, errors.New("expected a string for an address")
 			}
+
+			if strings.HasPrefix(addr, "$") {
+				contractName := strings.TrimPrefix(addr, "$")
+				contractNameJSON, ok := contractNameRegistry[contractName]
+				if !ok {
+					return nil, errors.Errorf("unknown contract name %s", contractName)
+				}
+
+				deployedAddr, err := getDeployedAddress(contractNameJSON)
+				if err != nil {
+					return nil, err
+				}
+				addr = *deployedAddr
+			}
+
 			if len(addr) != 42 {
 				return nil, errors.New("ethereum address must be 42 characters long")
 			}
@@ -147,4 +166,27 @@ func (c Config) peerAddresses() []common.Address {
 		addrs = append(addrs, peer.PerunID)
 	}
 	return addrs
+}
+
+// getDeployedAddress returns the contract's address with name `contractName`
+// that should be saved in a JSON file in the ../perun-eth-contracts folder.
+func getDeployedAddress(contractName string) (*string, error) {
+	contractAddrsFile, err := os.Open("../perun-eth-contracts/deployed-contracts.json")
+	if err != nil {
+		return nil, errors.Wrap(err, "opening contracts addresses file")
+	}
+	defer contractAddrsFile.Close()
+
+	var contractAddrs map[string]string
+	byteValue, _ := ioutil.ReadAll(contractAddrsFile)
+	err = json.Unmarshal(byteValue, &contractAddrs)
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing contract addresses file")
+	}
+	addr, ok := contractAddrs[contractName]
+
+	if !ok {
+		return nil, errors.Errorf("contract %s not found in contract addresses file", contractName)
+	}
+	return &addr, nil
 }

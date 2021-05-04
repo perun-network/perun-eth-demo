@@ -20,6 +20,13 @@ type (
 var contractSetupOptions = [...]string{"validate", "deploy", "none"}
 var assetTypeOptions = [...]string{"eth", "erc20"}
 
+var contractNameRegistry = map[string]string{
+	"adjudicator_address":      "adjudicator",
+	"assetholderETH_address":   "assetholderETH",
+	"assetholderERC20_address": "assetholderERC20",
+	"peruntoken_address":       "perunToken",
+}
+
 const (
 	contractSetupOptionValidate deploymentOption = iota
 	contractSetupOptionDeploy

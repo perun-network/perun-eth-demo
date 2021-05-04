@@ -68,13 +68,21 @@ chains:
 contracts:
   # deploy | validate | none
   deployment: none
+
+  # The addresses of the contracts can be automatically fetched from the
+  # ../perun-eth-contracts/ folder using the $contract_name syntax.
+
+  # Or $adjudicator_address.
   adjudicator: 0x57A844f4D338dc63AA643AD527AF3f3cB4371b3B
   assets:
     ETH:
       type: eth
+      # Or $assetholderETH_address.
       assetholder: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
 
     PerunToken:
       type: erc20
+      # Or $peruntoken_address.
       address: 0x3Eb6396C66340C52c78195B67080AEf757Bf8724
+      # Or $assetholderERC20_address.
       assetholder: 0x1761A5540Ae22d1b619613CbB92D9e9CFd660D00
