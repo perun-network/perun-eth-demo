@@ -20,6 +20,7 @@ import (
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/pkg/errors"
 
+	"perun.network/go-perun/backend/ethereum/channel"
 	echannel "perun.network/go-perun/backend/ethereum/channel"
 	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	phd "perun.network/go-perun/backend/ethereum/wallet/hd"
@@ -44,6 +45,10 @@ func Setup() {
 	var err error
 	if ethereumBackend, err = ethclient.Dial(config.Chain.URL); err != nil {
 		log.WithError(err).Fatalln("Could not connect to ethereum node.")
+	}
+	channel.GasLimit = config.Chain.GasLimit
+	if config.Chain.GasPrice >= 0 {
+		channel.SetGasPrice(config.Chain.GasPrice)
 	}
 	if backend, err = newNode(); err != nil {
 		log.WithError(err).Fatalln("Could not initialize node.")

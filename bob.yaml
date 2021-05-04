@@ -2,12 +2,6 @@ alias: bob
 mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
 accountIndex: 1
 
-channel:
-  timeout: 300s
-  fundTimeout: 300s
-  settleTimeout: 300s
-  challengeDurationSec: 600
-
 node:
   ip: 0.0.0.0
   port: 5751
@@ -15,48 +9,3 @@ node:
   handleTimeout: 300s
   reconnectTimeout: 20s
   persistencePath: /tmp/bob_database
-
-chains:
-  default:          # Localhost is default
-    url: ws://127.0.0.1:8545
-    txTimeout: 30s
-    ID: 1337
-
-  kovan:            # Kovan L1 public test-net
-    url: wss://kovan.infura.io/ws/v3/f95c9b7131cb4912b43aca853bfe3c5c
-    txTimeout: 60s
-    ID: 42
-
-  arbitrum_kovan:   # Arbitrum L2 public test-net
-    url: wss://kovan4.arbitrum.io/ws
-    txTimeout: 300s
-    ID: 0xc1b54a854098
-
-  arbitrum_local:   # Arbitrum L2 self hosted test-net
-    url: ws://172.107.242.118:8548
-    txTimeout: 60s
-    ID: 0x8bf17f3ea3a3
-  
-  optimism_kovan:   # Optimism L2 public test-net
-    url: wss://ws-kovan.optimism.io
-    txTimeout: 30s
-    ID: 1337
-  
-  optimism_local:   # Optimism L2 self hosted test-net
-    url: http://127.0.0.1:8545
-    txTimeout: 30s
-    ID: 1337
-
-contracts:
-  # deploy | validate | none
-  deployment: none
-  adjudicator: 0x99125AF46efa71EB1a71E164e29DF292413EB95a
-  assets:
-    ETH:
-      type: eth
-      assetholder: 0x490924a01C3Ac6425Bc21a07042df5130D6ec295
-
-    PerunToken:
-      type: erc20
-      address: 0x57657a5CDaf68ACc364e38840a87Bdf6B48Af7A1
-      assetholder: 0x39aDE7325485418a25332d0f573BF66ef305936c

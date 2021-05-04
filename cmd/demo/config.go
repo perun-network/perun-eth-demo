@@ -54,6 +54,8 @@ type (
 		TxTimeout time.Duration // timeout duration for on-chain transactions
 		URL       string        // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
 		ID        int64         // Chain ID
+		GasLimit  uint64
+		GasPrice  int64
 	}
 
 	contractConfig struct {

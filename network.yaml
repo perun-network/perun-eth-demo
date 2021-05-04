@@ -8,3 +8,66 @@ peers:
     perunID: 0x70765701b79a4e973dAbb4b30A72f5a845f22F9E
     hostname: 127.0.0.1
     port: 5751
+
+channel:
+  timeout: 300s
+  fundTimeout: 300s
+  settleTimeout: 300s
+  challengeDurationSec: 600
+
+chains:
+  default:          # Localhost is default
+    url: ws://127.0.0.1:8545
+    txTimeout: 30s
+    ID: 1337
+    GasLimit: 6600000
+    GasPrice: -1
+
+  kovan:            # Kovan L1 public test-net
+    url: wss://kovan.infura.io/ws/v3/f95c9b7131cb4912b43aca853bfe3c5c
+    txTimeout: 60s
+    ID: 42
+    GasLimit: 6600000
+    GasPrice: -1
+
+  arbitrum_kovan:   # Arbitrum L2 public test-net
+    url: wss://kovan4.arbitrum.io/ws
+    txTimeout: 300s
+    ID: 0xc1b54a854098
+    GasLimit: 66000000
+    GasPrice: -1
+
+  arbitrum_local:   # Arbitrum L2 self hosted test-net
+    url: ws://172.107.242.118:8548
+    txTimeout: 60s
+    ID: 0x8bf17f3ea3a3
+    GasLimit: 66000000
+    GasPrice: -1
+  
+  optimism_kovan:   # Optimism L2 public test-net
+    url: wss://ws-kovan.optimism.io
+    txTimeout: 30s
+    ID: 1337
+    GasLimit: 8999999
+    GasPrice: 0
+  
+  optimism_local:   # Optimism L2 self hosted test-net
+    url: ws://172.107.242.118:8546
+    txTimeout: 30s
+    ID: 420
+    GasLimit: 8999999
+    GasPrice: 0
+
+contracts:
+  # deploy | validate | none
+  deployment: none
+  adjudicator: 0x57A844f4D338dc63AA643AD527AF3f3cB4371b3B
+  assets:
+    ETH:
+      type: eth
+      assetholder: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
+
+    PerunToken:
+      type: erc20
+      address: 0x3Eb6396C66340C52c78195B67080AEf757Bf8724
+      assetholder: 0x1761A5540Ae22d1b619613CbB92D9e9CFd660D00
