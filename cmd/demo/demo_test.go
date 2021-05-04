@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,14 +51,16 @@ func nodeCmd(name string) (*Cmd, error) {
 }
 
 const (
-	blockTime    = 5 * time.Second
-	numUpdates   = 25
+	blockTime    = 500 * time.Millisecond
+	numUpdates   = 10
 	ethUrl       = "ws://127.0.0.1:8545"
 	addressAlice = "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B"
 	addressBob   = "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E"
 )
 
 func TestNodes(t *testing.T) {
+	b := getCurrentBlock()
+
 	// Start Alice.
 	alice, err := nodeCmd("alice")
 	require.NoError(t, err)
@@ -72,7 +73,7 @@ func TestNodes(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, bob.Start())
 	defer bob.Process.Kill()
-	time.Sleep(5 * time.Second) // Give Bob some time to initialize.
+	time.Sleep(3 * time.Second) // Give Bob some time to initialize.
 
 	// Get the initial on-chain balances from Alice and Bob.
 	initBals, err := getOnChainBals()
@@ -81,7 +82,7 @@ func TestNodes(t *testing.T) {
 
 	// Alice opens channel with Bob.
 	require.NoError(t, alice.sendCommand("open bob 100 100\n"), "proposing channel")
-	time.Sleep(3 * time.Second) // Ensure that Bob really received the proposal.
+	time.Sleep(1 * time.Second) // Ensure that Bob really received the proposal.
 	require.NoError(t, bob.sendCommand("y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")
 	time.Sleep(blockTime) // Wait 1 block for funding transactions to be confirmed.
@@ -99,7 +100,7 @@ func TestNodes(t *testing.T) {
 	t.Log("Closing channel…")
 	require.NoError(t, alice.sendCommand("close bob\n"))
 	// Wait 2 blocks for the settle and withdrawal transactions plus some additional seconds.
-	time.Sleep(2*blockTime + 5*time.Second)
+	time.Sleep(2*blockTime + 1*time.Second)
 
 	// Get the final balances from Alice and Bob after the settlement.
 	finalBals, err := getOnChainBals()
@@ -107,17 +108,64 @@ func TestNodes(t *testing.T) {
 
 	t.Logf("Final on-chain balances: Alice = %f, Bob = %f", finalBals[0], finalBals[1])
 
-	var diffBals [2]float64
+	// var diffBals [2]float64
 
-	// Calculate the differences between the initial and final balances.
-	diffBals[0], _ = finalBals[0].Sub(finalBals[0], initBals[0]).Float64()
-	diffBals[1], _ = finalBals[1].Sub(finalBals[1], initBals[1]).Float64()
+	// // Calculate the differences between the initial and final balances.
+	// diffBals[0], _ = finalBals[0].Sub(finalBals[0], initBals[0]).Float64()
+	// diffBals[1], _ = finalBals[1].Sub(finalBals[1], initBals[1]).Float64()
 
-	// Check the on-chain balance differences while allowing a higher deviation for Alice.
-	assert.InEpsilon(t, numUpdates, diffBals[0], 0.1)
-	assert.InEpsilon(t, -numUpdates, diffBals[1], 0.01)
+	// // // Check the on-chain balance differences while allowing a higher deviation for Alice.
+	// // assert.InEpsilon(t, numUpdates, diffBals[0], 0.1)
+	// // assert.InEpsilon(t, -numUpdates, diffBals[1], 0.01)
+
+	printGasUsageFromBlock(b)
 
 	t.Log("Done")
+}
+
+func getCurrentBlock() uint64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := ethclient.DialContext(ctx, ethUrl)
+	if err != nil {
+		panic(err)
+	}
+
+	n, err := client.BlockNumber(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+func printGasUsageFromBlock(b uint64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := ethclient.DialContext(ctx, ethUrl)
+	if err != nil {
+		return err
+	}
+
+	n, err := client.BlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
+	gasUsedAccumulated := 0
+	for i := n; i >= b; i-- {
+		b, err := client.BlockByNumber(ctx, big.NewInt(int64(i)))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%v: %v\n", b.Hash(), b.GasUsed())
+		gasUsedAccumulated += int(b.GasUsed())
+	}
+
+	fmt.Printf("total: %v\n", gasUsedAccumulated)
+
+	return nil
 }
 
 func (cmd *Cmd) sendCommand(str string) error {
