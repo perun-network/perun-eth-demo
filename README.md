@@ -30,6 +30,14 @@ go build
 ./perun-eth-demo
 ```
 
+## Contracts
+
+To deploy the contracts follow the [README](https://github.com/perun-network/perun-eth-contracts/tree/scaling-eth-21) of the contracts repo.
+
+Copy the addresses that are printed into the files `alice.yaml` and `bob.yaml` under section `contracts`.  
+Ensure that the `contracts.deployment` value is `none` since contracts that are deployed
+with hardhat can not be validated.
+
 ## Demo
 
 Currently, the only available sub-command of _perun-eth-demo_ is `demo`, which starts the CLI node. The node's
@@ -37,62 +45,55 @@ configuration file can be chosen with the `--config` flag. Two sample
 configurations `alice.yaml` and `bob.yaml` are provided. A default network
 configuration for Alice and Bob is provided in file `network.yaml`.
 
-## Example Walkthrough
-In a first terminal, start a `ganache-cli` development blockchain, prefunding
-the accounts of `Alice` and `Bob` derived from the mnemonic seed:
+## Example Walkthrough - Arbitrum
+
+1. In a first terminal, start an `arbitrum` development blockchain.  
+Follow [this](https://developer.offchainlabs.com/docs/local_blockchain) tutorial or use the public Kovan4 test-net with infura.
+
+2. Open a terminal, start the node of Alice with
 ```sh
-ganache-cli -m "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic" --block-time 5 -e 1000
+./perun-eth-demo demo --config alice.yaml --chain arbitrum_kovan
 ```
 
-In a second terminal, start the node of Alice with
+3. In a second terminal, start the node of Bob with
 ```sh
-./perun-eth-demo demo --config alice.yaml
+./perun-eth-demo demo --config bob.yaml --chain arbitrum_kovan
 ```
-and in a third terminal, start the node of Bob with
-```sh
-./perun-eth-demo demo --config bob.yaml
-```
-It is important to start Alice first as she is the one deploying the channel contracts.
-Bob validates the contracts at startup and quits if the contracts have not been deployed correctly.
-You can see two transactions in the ganache terminal corresponding to the
-deployment of the `AssetHolder` and `Adjudicator` contracts.
 
 Once both CLIs are running, e.g. in Alice's terminal, propose a payment channel
-to Bob with 100 ETH deposit from both sides via the following command.
+to Bob with 10 *PerunToken* deposit from both sides via the following command.
 ```
-> open bob 100 100
+> open bob peruntoken 10 10
 ```
 In Alice's terminal, accept the appearing channel proposal.
 ```
-🔁 Incoming channel proposal from alice with funding [My: 100 Ξ, Peer: 100 Ξ].
+🔁 Incoming channel proposal from bob with peruntoken funding [My: 10, Peer: 10].
 Accept (y/n)? > y
 ```
-In the ganache terminal, you can see two new transactions, which correspond to
-the funding transactions by Alice and Bob.
+The terminal will print the hashes of two transaction: *IncreaseAllowance* and *Deposit*.
 
 Now you can execute off-chain payments, e.g. in Bob's terminal with
 ```
-> send alice 10
+> send alice 1
 ```
 The updated balance will immediately be printed in both terminals, but no
-transaction will be visible in the ganache's terminal.
+transaction will be visible on-chain.
 
 You may always check the current status with command `info`.
 
 You can also run a performance benchmark with command
 ```
-> benchmark alice 10 100
+> benchmark alice 5 100
 ```
-which will send 10 ETH in 100 micro-transactions from Bob to Alice. Transaction performance will be printed in a table.
+which will send 5 *PerunToken* in 100 micro-transactions from Bob to Alice. Transaction performance will be printed in a table.
 
 Finally, you can settle the channel on either side with
 ```
 > close alice
 ```
-which will send one `concludeFinal` and two withdrawal transactions to the
-ganache blockchain.
+which will send one `concludeFinal` and two withdrawal transactions to the chain.
 
-Now you can exit the CLI with command `exit`.
+Now you can exit the CLI with command `exit` or `Ctrl+D`.
 
 ## Copyright
 
