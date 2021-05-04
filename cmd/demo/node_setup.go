@@ -158,6 +158,7 @@ func (n *node) setupContracts() error {
 			}
 			n.assets[name] = asset.Assetholder
 		}
+		fmt.Println("✅ Contracts validated.")
 	case contractSetupOptionDeploy:
 		// Deploy Adjudicator
 		var err error
@@ -183,17 +184,33 @@ func (n *node) setupContracts() error {
 					depositors[ewallet.Address(asset.Assetholder)] = &echannel.ERC20Depositor{Token: asset.Assetholder}
 				}
 			default:
-				err = errors.Errorf("invalid asset type: %s", asset.Type)
+				log.Panicf("invalid asset type: %v", asset.Type)
 			}
 			if err != nil {
 				return errors.WithMessagef(err, "validating asset: %s", name)
 			}
+			n.assets[name] = asset.Assetholder
 		}
+		fmt.Println("✅ Contracts deployed.")
+	case contractSetupOptionNone:
+		// Set adjudicator
+		n.adjAddr = config.Contracts.Adjudicator
+		// Set all depositors
+		for name, asset := range config.Contracts.Assets {
+			switch asset.Type {
+			case assetTypeEth:
+				depositors[ewallet.Address(asset.Assetholder)] = new(echannel.ETHDepositor)
+			case assetTypeErc20:
+				depositors[ewallet.Address(asset.Assetholder)] = &echannel.ERC20Depositor{Token: asset.Address}
+			default:
+				log.Panicf("invalid asset type: %v", asset.Type)
+			}
+			n.assets[name] = asset.Assetholder
+		}
+		fmt.Println("✅ Contracts set.")
 	default:
 		return errors.New(fmt.Sprintf("Unsupported contract setup method '%s'.", contractSetup))
 	}
-
-	fmt.Println("✅ Contracts validated.")
 
 	withdrawAddr := ewallet.AsEthAddr(n.onChain.Address())
 	n.adjudicator = echannel.NewAdjudicator(n.cb, n.adjAddr, withdrawAddr, n.onChain.Account)
