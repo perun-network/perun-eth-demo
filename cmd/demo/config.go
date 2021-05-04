@@ -6,7 +6,6 @@
 package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 import (
-	"log"
 	"reflect"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"perun.network/go-perun/log"
 )
 
 // Config contains all configuration read from config.yaml and network.yaml
@@ -25,7 +25,8 @@ type (
 		AccountIndex uint
 		Channel      channelConfig
 		Node         nodeConfig
-		Chain        chainConfig
+		Chain        chainConfig             // The selected chain config.
+		Chains       map[string]*chainConfig // All configured chain configs.
 		Contracts    contractConfig
 		// Read from the network.yaml. The key is the alias.
 		Peers map[string]*netConfigEntry
@@ -104,6 +105,12 @@ func SetConfig() {
 	if err := viper.Unmarshal(&config, opts); err != nil {
 		log.Fatal(err)
 	}
+	chain, ok := config.Chains[flags.chain]
+	if !ok {
+		log.Fatalf("Could not find chain config '%s'", flags.chain)
+	}
+	log.Infof("Using chain '%s'", flags.chain)
+	config.Chain = *chain
 }
 
 // parseEthAddress is used by viper to parse the custom types out of the yaml struct.

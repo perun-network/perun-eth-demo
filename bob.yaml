@@ -4,32 +4,49 @@ accountIndex: 1
 
 channel:
   timeout: 300s
-  fundTimeout: 30s
+  fundTimeout: 300s
   settleTimeout: 300s
   challengeDurationSec: 600
 
 node:
   ip: 0.0.0.0
-  port: 5751
+  port: 5750
   dialTimeout: 300s
   handleTimeout: 300s
   reconnectTimeout: 20s
   persistencePath: /tmp/bob_database
 
-chain:
-  url: ws://172.107.242.118:8548
-  txTimeout: 60s
-  ID: 0x8bf17f3ea3a3
+chains:
+  default:    # Localhost is default
+    url: ws://127.0.0.1:8545
+    txTimeout: 30s
+    ID: 1337
+
+  kovan4:     # Arbitrum L2 public test-net
+    url: https://kovan.infura.io/v3/f95c9b7131cb4912b43aca853bfe3c5c
+    txTimeout: 60s
+    ID: 42
+
+  kovan_oty:  # Arbitrum L2 self hosted test-net
+    url: ws://172.107.242.118:8548
+    txTimeout: 60s
+    ID: 0x8bf17f3ea3a3
+    
+  kovanop:    # Optimism L2 public test-net
+    url: wss://ws-kovan.optimism.io
+    txTimeout: 30s
+    ID: 1337
 
 contracts:
-  deployment: validate
-  adjudicator: 0xb00C0f59A68Ff779838d6D92fb4e39400cC76ADD
+  deployment: deploy
+  adjudicator: 0x749D2cB17884896518D7f9dF3122C536b49e0185
 
   assets:
     ETH:
       type: eth
-      assetholder: 0x6e8C10041394b49Ca0785b7A9aAC6EdF476eC256
+      assetholder: 0x3f5AfF66D8222c593a66D10c87f7030B9e2646b7
+
     PerunToken:
       type: erc20
-      address: 0xf75605Fe9695d85Aa3D66ECB5dd09224b613c38B
-      assetholder: 0x63Cd5b35728B44E14f132366407756bE0046cA68
+      address: 0x8A050Ddb3d30845544bb3eA82Dd343ba4090eb07
+      assetholder: 0x509fE9A1064347E1182842482eF5DF24f9603E4c
