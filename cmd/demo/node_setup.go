@@ -124,9 +124,35 @@ func (n *node) setup() error {
 	if err := n.setupPersistence(); err != nil {
 		return errors.WithMessage(err, "setting up persistence")
 	}
+	err = n.setupHub()
 	go n.client.Handle(n, n)
 	go n.bus.Listen(listener)
 	n.PrintConfig()
+	return err
+}
+
+func (n *node) setupHub() error {
+	n.log.Debugf("Hub side: %v", config.Hub.Side)
+
+	switch config.Hub.Side {
+	case hubSideActive:
+		n.hub = client.NewHub(config.Hub.IP, config.Hub.Port)
+
+		if err := n.hub.SetupActive(); err != nil {
+			return errors.WithMessage(err, "setup active hub")
+		}
+		n.client.SetHub(n.hub)
+	case hubSidePassive:
+		n.hub = client.NewHub(config.Hub.IP, config.Hub.Port)
+
+		if err := n.hub.SetupPassive(1); err != nil {
+			return errors.WithMessage(err, "setup passive hub")
+		}
+		n.client.SetHub(n.hub)
+	case hubSideDisabled:
+	default:
+		panic("unknown hub side")
+	}
 	return nil
 }
 

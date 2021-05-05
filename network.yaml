@@ -9,6 +9,16 @@ peers:
     hostname: 127.0.0.1
     port: 5751
 
+  ingrid_alice:
+    perunID: 0xF73C1cdA5bD32E6693D3cB313Bd9B9338d96f184
+    hostname: 127.0.0.1
+    port: 5752
+
+  ingrid_bob:
+    perunID: 0xC1b2444C0aAD4DE3f1E76C2F617B593eba75cb5a
+    hostname: 127.0.0.1
+    port: 5753
+
 channel:
   timeout: 300s
   fundTimeout: 300s
@@ -73,16 +83,16 @@ contracts:
   # ../perun-eth-contracts/ folder using the $contract_name syntax.
 
   # Or $adjudicator_address.
-  adjudicator: 0x2411fA9EabdF4Bd589678dcF461613af63296A5d
+  adjudicator: $adjudicator_address
   assets:
     ETH:
       type: eth
       # Or $assetholderETH_address.
-      assetholder: 0x1B82363756bE3e1db8C46A0c44f676A7f866308d
+      assetholder: $assetholderETH_address
 
     PerunToken:
       type: erc20
       # Or $peruntoken_address.
-      address: 0x213ac92B798C9D4e971bd7363fE826538F1a70AC
+      address: $peruntoken_address
       # Or $assetholderERC20_address.
-      assetholder: 0xbB7e3b2D5286153a46648639B56384476699E4D4
+      assetholder: $assetholderERC20_address

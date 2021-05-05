@@ -31,6 +31,7 @@ type (
 		Contracts    contractConfig
 		// Read from the network.yaml. The key is the alias.
 		Peers map[string]*netConfigEntry
+		Hub   hubConfig
 	}
 
 	channelConfig struct {
@@ -49,6 +50,12 @@ type (
 
 		PersistencePath    string
 		PersistenceEnabled bool
+	}
+
+	hubConfig struct {
+		Side hubSide
+		IP   string
+		Port uint16
 	}
 
 	chainConfig struct {
@@ -154,6 +161,8 @@ func parseEthAddress() mapstructure.DecodeHookFunc {
 				return nil, errors.New("invalid ethereum address")
 			}
 			return common.HexToAddress(addr), nil
+		case reflect.TypeOf(hubSide(0)):
+			return parseHubSide(data.(string))
 		case reflect.TypeOf(deploymentOption(0)):
 			return parseContractSetupOption(data.(string))
 		case reflect.TypeOf(assetType(0)):

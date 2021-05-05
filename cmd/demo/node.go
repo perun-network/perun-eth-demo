@@ -16,6 +16,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	_ "perun.network/go-perun/backend/ethereum" // backend init
@@ -44,6 +45,7 @@ type node struct {
 	bus    *wirenet.Bus
 	client *client.Client
 	dialer *simple.Dialer
+	hub    *client.Hub
 
 	// Account for signing on-chain TX. Currently also the Perun-ID.
 	onChain *phd.Account
@@ -120,14 +122,31 @@ func (n *node) connect(alias string) error {
 	return nil
 }
 
-// peer returns the peer with the address `addr` or nil if not found.
+// peer returns the peer with the address `addr` or creates it if not found.
 func (n *node) peer(addr wire.Address) *peer {
+	if addr == nil {
+		n.log.Error("Nil address")
+		return nil
+	}
 	for _, peer := range n.peers {
 		if peer.perunID.Equals(addr) {
 			return peer
 		}
 	}
-	return nil
+	alias, cfg := findConfig(addr)
+
+	if cfg == nil {
+		return nil
+	}
+	p := &peer{
+		alias:   alias,
+		perunID: addr,
+		log:     log.WithField("peer", addr),
+	}
+	n.peers[alias] = p
+	n.log.WithField("channel", addr).WithField("alias", alias).Debug("New peer")
+
+	return p
 }
 
 func (n *node) channelPeer(ch *client.Channel) *peer {
@@ -241,55 +260,17 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 	return nil
 }
 
-func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalResponder) {
-	req, ok := prop.(*client.LedgerChannelProposal)
-	if !ok || (req.Valid() != nil) {
-		log.Fatal("Can handle only ledger channel proposals.")
-	}
-	if len(req.Peers) != 2 {
-		log.Fatal("Only channels with two participants are currently supported")
-	}
-	if len(req.Base().InitBals.Assets) != 1 {
-		log.Fatal("Only channels with one asset are currently supported")
-	}
-	_assetAddr, ok := req.Base().InitBals.Assets[0].(*echannel.Asset)
-	if !ok {
-		log.Fatal("Need ethereum asset")
-	}
-	assetAddr := common.Address(*_assetAddr)
-
-	n.mtx.Lock()
-	defer n.mtx.Unlock()
-	id := req.Peers[0]
-	n.log.Debug("Received channel proposal")
-	// Check the asset
-	asset, found := n.findAsset(assetAddr)
-	if !found {
-		reason := fmt.Sprintf("unknown asset: %s", assetAddr.Hex())
-		n.rejectProposal(res, reason)
-		return
-	}
-
+func (n *node) handleLedgerProposal(prop *client.LedgerChannelProposal, assetName string, res *client.ProposalResponder) {
+	id := prop.Peers[0]
+	n.log.Debug("Received ledger channel proposal")
 	// Find the peer by its perunID and create it if not present
 	p := n.peer(id)
-	alias, cfg := findConfig(id)
-
 	if p == nil {
-		if cfg == nil {
-			n.rejectProposal(res, "Unknown identity")
-			return
-		}
-		p = &peer{
-			alias:   alias,
-			perunID: id,
-			log:     log.WithField("peer", id),
-		}
-		n.peers[alias] = p
-		n.log.WithField("channel", id).WithField("alias", alias).Debug("New peer")
+		n.rejectProposal(res, "Unknown identity")
 	}
 	n.log.WithField("peer", id).Debug("Channel proposal")
 
-	bals := weiToEther(req.InitBals.Balances[0]...)
+	bals := weiToEther(prop.InitBals.Balances[0]...)
 	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
 	msg := fmt.Sprintf("🔁 Incoming channel proposal from %[1]v with funding [My: %[2]v %[4]s, Peer: %[3]v %[4]s].\nAccept (y/n)? ",
 		alias, ourBal, theirBal, asset.Type.Symbol())
@@ -299,7 +280,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 		if userInput == "y" {
 			fmt.Printf("✅ Channel proposal accepted. Opening channel...\n")
-			a := req.Accept(n.offChain.Address(), client.WithRandomNonce())
+			a := prop.Accept(n.offChain.Address(), client.WithRandomNonce())
 			if _, err := res.Accept(ctx, a); err != nil {
 				n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
 				return
@@ -314,18 +295,148 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	})
 }
 
+func (n *node) handleVirtualProposal(prop *client.VirtualChannelProposal, assetName string, res *client.ProposalResponder) {
+	id := prop.Peers[0]
+	n.log.Debug("Received virtual channel proposal")
+
+	p := n.peer(id)
+	if p == nil {
+		n.rejectProposal(res, "Unknown identity")
+	}
+	n.log.WithField("peer", id).Debug("Channel proposal")
+
+	bals := weiToEther(prop.InitBals.Balances[0]...)
+	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
+	msg := fmt.Sprintf("🔁 Incoming virtual channel proposal from %v with %s funding [My: %v, Peer: %v].\nWhich hub to do want to accept with (y/n)? ", p.alias, assetName, ourBal, theirBal)
+	Prompt(msg, func(userInput string) {
+		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
+		defer cancel()
+		for {
+			if userInput == "y" {
+				fmt.Printf("✅ Virtual channel proposal accepted. Opening channel...\n")
+				a := prop.Accept(n.offChain.Address(), client.WithRandomNonce())
+				ch, err := res.Accept(ctx, a)
+				if err != nil {
+					n.log.Error(errors.WithMessage(err, "accepting channel proposal"))
+					return
+				}
+				if n.channel(ch.ID()) == nil {
+					n.log.Error("Could not set up channel")
+					return
+				}
+				break
+			} else {
+				fmt.Printf("❌ Virtual channel proposal rejected\n")
+				if err := res.Reject(ctx, "rejected by user"); err != nil {
+					n.log.Error(errors.WithMessage(err, "rejecting channel proposal"))
+					return
+				}
+				break
+			}
+		}
+	})
+}
+
+func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalResponder) {
+	if prop.Base().NumPeers() != 2 {
+		log.Fatal("Only channels with two participants are currently supported.")
+	}
+	if len(prop.Base().InitBals.Assets) != 1 {
+		log.Fatal("Only channels with one asset are currently supported.")
+	}
+	_assetAddr, ok := prop.Base().InitBals.Assets[0].(*echannel.Asset)
+	if !ok {
+		log.Fatal("Wrong asset type.")
+	}
+	assetName, found := n.findAsset(common.Address(*_assetAddr))
+	if !found {
+		reason := fmt.Sprint("unknown asset")
+		n.rejectProposal(res, reason)
+		return
+	}
+
+	n.mtx.Lock()
+	defer n.mtx.Unlock()
+	switch prop := prop.(type) {
+	case *client.LedgerChannelProposal:
+		n.handleLedgerProposal(prop, assetName, res)
+	case *client.VirtualChannelProposal:
+		n.handleVirtualProposal(prop, assetName, res)
+	default:
+		log.Fatal("Unknown channel proposal type.")
+	}
+}
+
+func (n *node) OpenVirtual(args []string) error {
+	n.mtx.Lock()
+	defer n.mtx.Unlock()
+	peer, err := n.ensurePeerConnected(args[0])
+	if err != nil {
+		return errors.WithMessage(err, "connecting to peer")
+	}
+	ingrid, err := n.ensurePeerConnected(args[1])
+	if err != nil {
+		return errors.WithMessage(err, "connecting to intermediary")
+	}
+	if peer.ch != nil {
+		return errors.New("channel to peer already open")
+	}
+	if ingrid.ch == nil {
+		return errors.New("no channel with intermediary")
+	}
+
+	asset := n.assets[args[3]]
+	myBalEth, _ := new(big.Float).SetString(args[4]) // Input was already validated by command parser.
+	peerBalEth, _ := new(big.Float).SetString(args[5])
+
+	initBals := &channel.Allocation{
+		Assets:   []channel.Asset{(*echannel.Asset)(&asset)},
+		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
+	}
+
+	otherChannel, err := hexutil.Decode(args[2])
+	if err != nil {
+		return errors.WithMessage(err, "parsing chanel id")
+	}
+	var id channel.ID
+	copy(id[:], otherChannel)
+	prop, err := client.NewVirtualChannelProposal(
+		ingrid.ch.ID(),
+		id,
+		config.Channel.ChallengeDurationSec,
+		n.offChain.Address(),
+		initBals,
+		[]wire.Address{n.onChain.Address(), peer.perunID},
+		client.WithRandomNonce(),
+	)
+	if err != nil {
+		return errors.WithMessage(err, "creating channel proposal")
+	}
+
+	fmt.Printf("💭 Proposing virtual channel to %v over %v...\n", args[0], args[1])
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.FundTimeout)
+	defer cancel()
+	n.log.Debug("Proposing virtual channel")
+	ch, err := n.client.ProposeChannel(ctx, prop)
+	if err != nil {
+		return errors.WithMessage(err, "proposing virtual channel")
+	}
+	if n.channel(ch.ID()) == nil {
+		return errors.New("OnNewChannel handler could not setup channel")
+	}
+	return nil
+}
+
 func (n *node) Open(args []string) error {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	peerName := args[0]
-	peer := n.peers[peerName]
-	if peer == nil {
-		// try to connect to peer
-		if err := n.connect(peerName); err != nil {
-			return err
-		}
-		peer = n.peers[peerName]
+	peer, err := n.ensurePeerConnected(peerName)
+	if err != nil {
+		return errors.WithMessage(err, "connecting to peer")
 	}
+
 	asset := n.assets[args[1]]
 	myBalEth, _ := new(big.Float).SetString(args[2]) // Input was already validated by command parser.
 	peerBalEth, _ := new(big.Float).SetString(args[3])
@@ -358,6 +469,7 @@ func (n *node) Open(args []string) error {
 	if n.channel(ch.ID()) == nil {
 		return errors.New("OnNewChannel handler could not setup channel")
 	}
+	fmt.Printf("✅ Opened channel 0x%x", ch.ID())
 	return nil
 }
 
@@ -509,4 +621,16 @@ func (n *node) assetTypeFromState(state channel.State) (*assetType, error) {
 		return nil, errors.Errorf("Could not find asset with address %v", assAddr)
 	}
 	return &asset.Type, nil
+}
+
+func (n *node) ensurePeerConnected(name string) (*peer, error) {
+	peer := n.peers[name]
+	if peer == nil {
+		// try to connect to peer
+		if err := n.connect(name); err != nil {
+			return nil, err
+		}
+		peer = n.peers[name]
+	}
+	return peer, nil
 }
