@@ -12,6 +12,7 @@ import (
 
 	"perun.network/go-perun/log"
 
+	"github.com/perun-network/perun-eth-demo/cmd/benchmark"
 	"github.com/perun-network/perun-eth-demo/cmd/demo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,6 +32,7 @@ func init() {
 	viper.BindPFlag("log.file", rootCmd.PersistentFlags().Lookup("log-file"))
 
 	rootCmd.AddCommand(demo.GetDemoCmd())
+	rootCmd.AddCommand(benchmark.GetCmd())
 }
 
 func runRoot(c *cobra.Command, args []string) {
