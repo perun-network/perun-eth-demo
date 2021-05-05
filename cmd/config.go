@@ -32,6 +32,9 @@ func setConfig() {
 
 	// Set the logging output file
 	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
 	if logConfig.File != "" {
 		f, err := os.OpenFile(logConfig.File,
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

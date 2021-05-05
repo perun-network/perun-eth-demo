@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -24,6 +25,7 @@ import (
 var cmdFlags struct {
 	Network  string
 	Mnemonic string
+	N        uint
 }
 
 func GetCmd() *cobra.Command {
@@ -36,13 +38,14 @@ func GetCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&cmdFlags.Network, "network", "ganache", "The blockchain network. One of [ganache, optimism, arbitrum].")
 	cmd.Flags().StringVar(&cmdFlags.Mnemonic, "mnenomic", "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic", "The mnemonic from which accounts are derived.")
+	cmd.Flags().UintVar(&cmdFlags.N, "n", 1, "The scale of the benchmark.")
 
 	return cmd
 }
 
 const (
-	commandTimeout    = 60 * time.Second
-	challengeDuration = 60
+	commandTimeout    = 120 * time.Second
+	challengeDuration = 120
 )
 
 type networkConfig struct {
@@ -91,10 +94,10 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	Execute(cmd.Context(), cmdFlags.Network, cmdFlags.Mnemonic)
+	Execute(cmd.Context(), cmdFlags.Network, cmdFlags.Mnemonic, cmdFlags.N)
 }
 
-func Execute(ctx context.Context, network string, mnemonic string) {
+func Execute(ctx context.Context, network string, mnemonic string, nChannels uint) {
 	cfg, ok := configs[network]
 	if !ok {
 		panic("invalid network")
@@ -145,16 +148,19 @@ func Execute(ctx context.Context, network string, mnemonic string) {
 	}
 
 	// Setup proposal handler for Client2.
-	var ch2 *client.Channel
+	var channels2 []*client.Channel
+	var mtx2 sync.Mutex
 	proposalHandler := &FunctionProposalHandler{
 		openingProposalHandler: func(cp client.ChannelProposal, pr *client.ProposalResponder) {
 			switch cp := cp.(type) {
 			case *client.LedgerChannelProposal:
-				_ch, err := pr.Accept(ctx, cp.Accept(c2.Address(), client.WithRandomNonce()))
+				ch, err := pr.Accept(ctx, cp.Accept(c2.Address(), client.WithRandomNonce()))
 				if err != nil {
 					panic(err)
 				}
-				ch2 = _ch
+				mtx2.Lock()
+				defer mtx2.Unlock()
+				channels2 = append(channels2, ch)
 			}
 		},
 		updateProposalHandler: func(s *channel.State, cu client.ChannelUpdate, ur *client.UpdateResponder) {
@@ -163,55 +169,91 @@ func Execute(ctx context.Context, network string, mnemonic string) {
 	}
 	go c2.Handle(proposalHandler, proposalHandler)
 
-	// Client1 proposes channel to Client2
-	prop, err := client.NewLedgerChannelProposal(
-		challengeDuration,
-		c1.Address(),
-		&channel.Allocation{
-			Assets:   []channel.Asset{wallet.AsWalletAddr(assetHolder)},
-			Balances: [][]*big.Int{{big.NewInt(1), big.NewInt(1)}},
-		},
-		[]wire.Address{c1.Address(), c2.Address()},
-		client.WithRandomNonce(),
-	)
-	if err != nil {
-		panic(err)
+	var wg sync.WaitGroup
+
+	var channels1 []*client.Channel
+	var mtx1 sync.Mutex
+	for i := 0; i < int(nChannels); i++ {
+		wg.Add(1)
+		time.Sleep(100 * time.Millisecond)
+		go func() {
+			// Client1 proposes channel to Client2
+			prop, err := client.NewLedgerChannelProposal(
+				challengeDuration,
+				c1.Address(),
+				&channel.Allocation{
+					Assets:   []channel.Asset{wallet.AsWalletAddr(assetHolder)},
+					Balances: [][]*big.Int{{big.NewInt(1), big.NewInt(1)}},
+				},
+				[]wire.Address{c1.Address(), c2.Address()},
+				client.WithRandomNonce(),
+			)
+			if err != nil {
+				panic(err)
+			}
+			ch, err := c1.ProposeChannel(ctx, prop)
+			if err != nil {
+				panic(err)
+			}
+			mtx1.Lock()
+			defer mtx1.Unlock()
+			channels1 = append(channels1, ch)
+
+			wg.Done()
+		}()
 	}
-	ch1, err := c1.ProposeChannel(ctx, prop)
-	if err != nil {
-		panic(err)
+	wg.Wait()
+
+	forEachChannel := func(channels []*client.Channel, f func(ch *client.Channel)) {
+		var wg sync.WaitGroup
+		for _, _ch := range channels {
+			ch := _ch
+			wg.Add(1)
+			time.Sleep(100 * time.Millisecond)
+			go func() {
+				f(ch)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
 	}
 
-	err = ch1.UpdateBy(ctx, func(s *channel.State) error {
-		diff := big.NewInt(1)
-		s.Allocation.Balances[0][0].Sub(s.Allocation.Balances[0][0], diff)
-		s.Allocation.Balances[0][1].Add(s.Allocation.Balances[0][1], diff)
-		s.IsFinal = true
-		return nil
+	forEachChannel(channels1, func(ch *client.Channel) {
+		err := ch.UpdateBy(ctx, func(s *channel.State) error {
+			diff := big.NewInt(1)
+			s.Allocation.Balances[0][0].Sub(s.Allocation.Balances[0][0], diff)
+			s.Allocation.Balances[0][1].Add(s.Allocation.Balances[0][1], diff)
+			s.IsFinal = true
+			return nil
+		})
+		if err != nil {
+			panic(err)
+		}
 	})
-	if err != nil {
-		panic(err)
-	}
 
-	err = ch1.Register(ctx)
-	if err != nil {
-		panic(err)
-	}
+	forEachChannel(channels1, func(ch *client.Channel) {
+		err := ch.Register(ctx)
+		if err != nil {
+			panic(err)
+		}
 
-	err = ch1.Settle(ctx, false)
-	if err != nil {
-		panic(err)
-	}
+		err = ch.Settle(ctx, false)
+		if err != nil {
+			panic(err)
+		}
+	})
 
-	err = ch2.Register(ctx)
-	if err != nil {
-		panic(err)
-	}
+	forEachChannel(channels2, func(ch *client.Channel) {
+		err := ch.Register(ctx)
+		if err != nil {
+			panic(err)
+		}
 
-	err = ch2.Settle(ctx, false)
-	if err != nil {
-		panic(err)
-	}
+		err = ch.Settle(ctx, false)
+		if err != nil {
+			panic(err)
+		}
+	})
 
 	printGasUsageFromBlock(b, nodeURL1)
 }

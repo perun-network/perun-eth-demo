@@ -13,13 +13,14 @@ import (
 func init() {
 	// Configure logging.
 	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
+	logger.SetLevel(logrus.TraceLevel)
 	log.Set(plogrus.FromLogrus(logger))
 }
 
 func TestExecute(t *testing.T) {
 	ctx := context.Background()
-	network := "ganache" // One of [ganache, optimism, arbitrum].
+	network := "optimism_local" // One of [ganache, optimism, arbitrum].
 	mnemonic := "pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic"
-	benchmark.Execute(ctx, network, mnemonic)
+	n := uint(1)
+	benchmark.Execute(ctx, network, mnemonic, n)
 }
