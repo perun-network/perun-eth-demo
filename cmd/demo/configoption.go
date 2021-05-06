@@ -13,12 +13,14 @@ import (
 )
 
 type (
+	assetName        string
 	assetType        int
 	deploymentOption int
 )
 
 var contractSetupOptions = [...]string{"validate", "deploy", "none"}
 var assetTypeOptions = [...]string{"eth", "erc20"}
+var assetTypeSymbols = [...]string{"Ξ", "PRN"}
 
 var contractNameRegistry = map[string]string{
 	"adjudicator_address":      "adjudicator",
@@ -34,6 +36,11 @@ const (
 )
 
 const (
+	assetNameEth   assetName = "eth"
+	assetNameERC20 assetName = "peruntoken"
+)
+
+const (
 	assetTypeEth assetType = iota
 	assetTypeErc20
 )
@@ -44,6 +51,10 @@ func (option deploymentOption) String() string {
 
 func (option assetType) String() string {
 	return assetTypeOptions[option]
+}
+
+func (option assetType) Symbol() string {
+	return assetTypeSymbols[option]
 }
 
 func parseContractSetupOption(s string) (option deploymentOption, err error) {

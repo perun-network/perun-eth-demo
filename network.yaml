@@ -26,7 +26,7 @@ chains:
   ganache:          # Local ganache
     url: ws://127.0.0.1:8545
     txTimeout: 30s
-    ID: 1620141566652
+    ID: 1337
     GasLimit: 6600000
     GasPrice: -1
 
@@ -54,7 +54,7 @@ chains:
   optimism_kovan:   # Optimism L2 public test-net
     url: wss://ws-kovan.optimism.io
     txTimeout: 30s
-    ID: 1337
+    ID: 69
     GasLimit: 8999999
     GasPrice: 0
   

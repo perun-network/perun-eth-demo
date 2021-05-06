@@ -60,7 +60,7 @@ func init() {
 			func([]string) error { return backend.PrintConfig() },
 		}, {
 			"info",
-			nil,
+			[]argument{{"Asset", valAsset}},
 			"Print information about funds, peers, and channels.",
 			func(args []string) error { return backend.Info(args) },
 		}, {

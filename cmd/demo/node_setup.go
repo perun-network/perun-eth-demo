@@ -80,7 +80,7 @@ func newNode() (*node, error) {
 		wallet:  wallet,
 		dialer:  dialer,
 		cb:      echannel.NewContractBackend(ethereumBackend, phd.NewTransactor(wallet.Wallet(), signer)),
-		assets:  make(map[string]common.Address),
+		assets:  make(map[string]*asset),
 		peers:   make(map[string]*peer),
 	}
 	return n, n.setup()
@@ -161,7 +161,7 @@ func (n *node) setupContracts() error {
 			if err != nil {
 				return errors.WithMessagef(err, "validating asset: %s", name)
 			}
-			n.assets[name] = asset.Assetholder
+			n.assets[name] = asset
 		}
 		fmt.Println("✅ Contracts validated.")
 	case contractSetupOptionDeploy:
@@ -194,7 +194,7 @@ func (n *node) setupContracts() error {
 			if err != nil {
 				return errors.WithMessagef(err, "validating asset: %s", name)
 			}
-			n.assets[name] = asset.Assetholder
+			n.assets[name] = asset
 		}
 		fmt.Println("✅ Contracts deployed.")
 	case contractSetupOptionNone:
@@ -210,7 +210,7 @@ func (n *node) setupContracts() error {
 			default:
 				log.Panicf("invalid asset type: %v", asset.Type)
 			}
-			n.assets[name] = asset.Assetholder
+			n.assets[name] = asset
 		}
 		fmt.Println("✅ Contracts set.")
 	default:
@@ -222,7 +222,7 @@ func (n *node) setupContracts() error {
 
 	accounts := make(map[echannel.Asset]accounts.Account)
 	for _, asset := range n.assets {
-		accounts[ewallet.Address(asset)] = n.onChain.Account
+		accounts[ewallet.Address(asset.Assetholder)] = n.onChain.Account
 	}
 	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
 
@@ -354,7 +354,7 @@ func (n *node) PrintConfig() error {
 			"Adjudicator: %s\n"+
 			"Assets:\n", config.Alias, config.Node.IP, config.Node.Port, config.Chain.URL, n.onChain.Address().String(), n.offChain.Address().String(), n.adjAddr.String())
 	for name, asset := range n.assets {
-		fmt.Printf("\t%s at %s\n", name, asset.Hex())
+		fmt.Printf("\t%s at %s\n", name, asset.Assetholder.Hex())
 	}
 
 	fmt.Println("Known peers:")

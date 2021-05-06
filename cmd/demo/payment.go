@@ -11,9 +11,12 @@ import (
 	"math/big"
 
 	"github.com/pkg/errors"
+
+	ewallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
+	"perun.network/go-perun/wallet"
 )
 
 type (
@@ -71,9 +74,15 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State) error, desc str
 
 	state := ch.State()
 	balChanged := stateBefore.Balances[0][0].Cmp(state.Balances[0][0]) != 0
+	assAddr := ewallet.AsEthAddr(state.Assets[0].(wallet.Address))
+	asset, found := config.findAsset(assAddr)
+	if !found {
+		log.Fatalf("Could not find asset with address %v", assAddr)
+	}
 	if balChanged {
 		bals := weiToEther(state.Allocation.Balances[0]...)
-		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+		fmt.Printf("💰 Sent payment. New balance: [My: %[1]v %[3]s, Peer: %[2]v %[3]s]\n",
+			bals[ch.Idx()], bals[1-ch.Idx()], asset.Type.Symbol()) // assumes two-party channel
 	}
 	if err == nil {
 		ch.lastState = state
@@ -108,7 +117,14 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 
 	if balChanged {
 		bals := weiToEther(update.State.Allocation.Balances[0]...)
-		PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+
+		assAddr := ewallet.AsEthAddr(update.State.Assets[0].(wallet.Address))
+		asset, found := config.findAsset(assAddr)
+		if !found {
+			log.Fatalf("Could not find asset with address %v", assAddr)
+		}
+		PrintfAsync("💰 Received payment. New balance: [My: %[1]v %[3]s, Peer: %[2]v %[3]s\n",
+			bals[ch.Idx()], bals[1-ch.Idx()], asset.Type.Symbol())
 	}
 	ch.lastState = update.State.Clone()
 }

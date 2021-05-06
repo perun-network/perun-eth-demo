@@ -6,6 +6,7 @@
 package demo // import "github.com/perun-network/perun-eth-demo/cmd/demo"
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -66,7 +67,13 @@ type (
 		Deployment deploymentOption
 
 		Adjudicator common.Address
-		Assets      map[string]*assetConfig
+		Assets      map[string]*asset
+	}
+
+	asset struct {
+		Type        assetType      `mapstructure:"type"`
+		Address     common.Address `mapstructure:"address"`
+		Assetholder common.Address `mapstructure:"assetholder"`
 	}
 
 	assetConfig struct {
@@ -189,4 +196,13 @@ func getDeployedAddress(contractName string) (*string, error) {
 		return nil, errors.Errorf("contract %s not found in contract addresses file", contractName)
 	}
 	return &addr, nil
+}
+
+func (c Config) findAsset(addr common.Address) (*asset, bool) {
+	for _, asset := range c.Contracts.Assets {
+		if bytes.Equal(asset.Assetholder.Bytes(), addr.Bytes()) {
+			return asset, true
+		}
+	}
+	return nil, false
 }

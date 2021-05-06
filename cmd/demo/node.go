@@ -54,7 +54,7 @@ type node struct {
 
 	adjudicator channel.Adjudicator
 	adjAddr     common.Address
-	assets      map[string]common.Address
+	assets      map[string]*asset
 	funder      channel.Funder
 	// Needed to deploy contracts.
 	cb echannel.ContractBackend
@@ -64,13 +64,27 @@ type node struct {
 	peers map[string]*peer
 }
 
-func getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, error) {
+func getOnChainBalETH(ctx context.Context, addrs ...wallet.Address) ([]*big.Int, error) {
 	bals := make([]*big.Int, len(addrs))
 	var err error
 	for idx, addr := range addrs {
 		bals[idx], err = ethereumBackend.BalanceAt(ctx, ewallet.AsEthAddr(addr), nil)
 		if err != nil {
-			return nil, errors.Wrap(err, "querying on-chain balance")
+			return nil, errors.Wrap(err, "querying on-chain ETH balance")
+		}
+	}
+	return bals, nil
+}
+
+func getOnChainBalERC20(ctx context.Context, token common.Address, addrs ...wallet.Address) ([]*big.Int, error) {
+	erc20 := echannel.ERC20Token{CB: ethereumBackend, Address: token}
+	bals := make([]*big.Int, len(addrs))
+
+	var err error
+	for idx, addr := range addrs {
+		bals[idx], err = erc20.BalanceOf(ctx, ewallet.AsEthAddr(addr))
+		if err != nil {
+			return nil, errors.Wrap(err, "querying on-chain ERC20 balance")
 		}
 	}
 	return bals, nil
@@ -148,8 +162,12 @@ func (n *node) setupChannel(ch *client.Channel) {
 	}()
 
 	bals := weiToEther(ch.State().Balances[0]...)
-	fmt.Printf("🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
-		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+	assType, err := n.assetTypeFromState(*ch.State())
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("🆕 Channel established with %[1]s. Initial balance: [My: %[2]v %[4]s, Peer: %[3]v %[4]s]\n",
+		p.alias, bals[ch.Idx()], bals[1-ch.Idx()], assType.Symbol()) // assumes two-party channel
 }
 
 func (n *node) HandleAdjudicatorEvent(e channel.AdjudicatorEvent) {
@@ -245,7 +263,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	id := req.Peers[0]
 	n.log.Debug("Received channel proposal")
 	// Check the asset
-	assetName, found := n.findAsset(assetAddr)
+	asset, found := n.findAsset(assetAddr)
 	if !found {
 		reason := fmt.Sprintf("unknown asset: %s", assetAddr.Hex())
 		n.rejectProposal(res, reason)
@@ -273,7 +291,8 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 	bals := weiToEther(req.InitBals.Balances[0]...)
 	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
-	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with %s funding [My: %v, Peer: %v].\nAccept (y/n)? ", alias, assetName, ourBal, theirBal)
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %[1]v funding [My: %[2]v %[4]s, Peer: %[3]v %[4]s].\nAccept (y/n)? ",
+		alias, ourBal, theirBal, asset.Type.Symbol())
 	Prompt(msg, func(userInput string) {
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 		defer cancel()
@@ -312,7 +331,7 @@ func (n *node) Open(args []string) error {
 	peerBalEth, _ := new(big.Float).SetString(args[3])
 
 	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{(*echannel.Asset)(&asset)},
+		Assets:   []channel.Asset{(*echannel.Asset)(&asset.Assetholder)},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
 
@@ -412,12 +431,23 @@ func (n *node) Info(args []string) error {
 	defer n.mtx.Unlock()
 	n.log.Traceln("Info...")
 
+	asset := n.assets[args[0]]
 	ctx, cancel := context.WithTimeout(context.Background(), config.Chain.TxTimeout)
 	defer cancel()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
-	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy Ξ\tPeer Ξ\tMy On-Chain Ξ\tPeer On-Chain Ξ\t\n")
+	fmt.Fprintf(w, "Peer\tPhase\tVersion\tMy %[1]s\tPeer %[1]s\tMy On-Chain %[1]s\tPeer On-Chain %[1]s\t\n", asset.Type.Symbol())
 	for alias, peer := range n.peers {
-		onChainBals, err := getOnChainBal(ctx, n.onChain.Address(), peer.perunID)
+		var onChainBals []*big.Int
+		var err error
+
+		switch asset.Type {
+		case assetTypeEth:
+			onChainBals, err = getOnChainBalETH(ctx, n.onChain.Address(), peer.perunID)
+		case assetTypeErc20:
+			onChainBals, err = getOnChainBalERC20(ctx, asset.Address, n.onChain.Address(), peer.perunID)
+		default:
+			return errors.Errorf("Unknown asset type %v", asset.Type)
+		}
 		if err != nil {
 			return err
 		}
@@ -425,7 +455,11 @@ func (n *node) Info(args []string) error {
 		if peer.ch == nil {
 			fmt.Fprintf(w, "%s\t%s\t \t \t \t%v\t%v\t\n", alias, "Connected", onChainBalsEth[0], onChainBalsEth[1])
 		} else {
-			bals := weiToEther(peer.ch.GetBalances())
+			bals := []*big.Float{big.NewFloat(0), big.NewFloat(0)}
+			assTypeCh, _ := n.assetTypeFromState(*peer.ch.lastState)
+			if *assTypeCh == asset.Type {
+				bals = weiToEther(peer.ch.GetBalances())
+			}
 			fmt.Fprintf(w, "%s\t%v\t%d\t%v\t%v\t%v\t%v\t\n",
 				alias, peer.ch.Phase(), peer.ch.State().Version, bals[0], bals[1], onChainBalsEth[0], onChainBalsEth[1])
 		}
@@ -459,11 +493,20 @@ func (n *node) ExistsAsset(asset string) bool {
 	return ok
 }
 
-func (n *node) findAsset(addr common.Address) (string, bool) {
-	for name, asset := range n.assets {
-		if bytes.Equal(asset.Bytes(), addr.Bytes()) {
-			return name, true
+func (n *node) findAsset(addr common.Address) (*asset, bool) {
+	for _, asset := range n.assets {
+		if bytes.Equal(asset.Assetholder.Bytes(), addr.Bytes()) {
+			return asset, true
 		}
 	}
-	return "", false
+	return nil, false
+}
+
+func (n *node) assetTypeFromState(state channel.State) (*assetType, error) {
+	assAddr := ewallet.AsEthAddr(state.Assets[0].(wallet.Address))
+	asset, found := n.findAsset(assAddr)
+	if !found {
+		return nil, errors.Errorf("Could not find asset with address %v", assAddr)
+	}
+	return &asset.Type, nil
 }
