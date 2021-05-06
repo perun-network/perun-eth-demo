@@ -73,16 +73,16 @@ contracts:
   # ../perun-eth-contracts/ folder using the $contract_name syntax.
 
   # Or $adjudicator_address.
-  adjudicator: 0x57A844f4D338dc63AA643AD527AF3f3cB4371b3B
+  adjudicator: 0x2411fA9EabdF4Bd589678dcF461613af63296A5d
   assets:
     ETH:
       type: eth
       # Or $assetholderETH_address.
-      assetholder: 0xfABaD4488e0E53EE30603fa5dF57244b1Fd937bF
+      assetholder: 0x1B82363756bE3e1db8C46A0c44f676A7f866308d
 
     PerunToken:
       type: erc20
       # Or $peruntoken_address.
-      address: 0x3Eb6396C66340C52c78195B67080AEf757Bf8724
+      address: 0x213ac92B798C9D4e971bd7363fE826538F1a70AC
       # Or $assetholderERC20_address.
-      assetholder: 0x1761A5540Ae22d1b619613CbB92D9e9CFd660D00
+      assetholder: 0xbB7e3b2D5286153a46648639B56384476699E4D4
