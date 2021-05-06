@@ -44,8 +44,8 @@ func GetCmd() *cobra.Command {
 }
 
 const (
-	commandTimeout    = 120 * time.Second
-	challengeDuration = 120
+	commandTimeout    = 360 * time.Second
+	challengeDuration = 360
 )
 
 type networkConfig struct {
@@ -113,7 +113,8 @@ func Execute(ctx context.Context, network string, mnemonic string, nChannels uin
 	ctx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 
-	b := getCurrentBlock(nodeURL1)
+	startBlock := getCurrentBlock(nodeURL1)
+	startTime := time.Now().Unix()
 
 	bus := wire.NewLocalBus()
 
@@ -255,7 +256,8 @@ func Execute(ctx context.Context, network string, mnemonic string, nChannels uin
 		}
 	})
 
-	printGasUsageFromBlock(b, nodeURL1)
+	printGasUsageFromBlock(startBlock, nodeURL1)
+	fmt.Printf("Time elapsed: %v seconds\n", time.Now().Unix()-startTime)
 }
 
 type FunctionProposalHandler struct {
@@ -400,11 +402,11 @@ func printGasUsageFromBlock(b uint64, ethURL string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Block %v: %v Gas\n", b.Hash(), b.GasUsed())
+		// fmt.Printf("Block %v: %v Gas\n", b.Hash(), b.GasUsed())
 		gasUsedAccumulated += int(b.GasUsed())
 	}
 
-	fmt.Printf("\nTotal: %v Gas\n\n", gasUsedAccumulated)
+	fmt.Printf("\nTotal: %v Gas in %d Blocks\n\n", gasUsedAccumulated, n-b)
 
 	return nil
 }
