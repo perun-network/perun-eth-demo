@@ -30,6 +30,7 @@ type CommandLineFlags struct {
 	testAPIEnabled bool
 	cfgFile        string
 	cfgNetFile     string
+	cfgCtrFile     string
 	useStdIO       bool
 	chain          string
 }
@@ -39,6 +40,7 @@ var flags CommandLineFlags
 func init() {
 	demoCmd.PersistentFlags().StringVar(&flags.cfgFile, "config", "config.yaml", "General config file")
 	demoCmd.PersistentFlags().StringVar(&flags.cfgNetFile, "network", "network.yaml", "Network config file")
+	demoCmd.PersistentFlags().StringVar(&flags.cfgCtrFile, "contracts", "", "Custom contracts addresses file")
 	demoCmd.PersistentFlags().BoolVar(&flags.testAPIEnabled, "test-api", false, "Expose testing API at 8080")
 	demoCmd.PersistentFlags().StringVar(&flags.chain, "chain", "default", "Select a chain from the config file.")
 	demoCmd.PersistentFlags().BoolVar(&GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
