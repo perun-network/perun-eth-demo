@@ -67,7 +67,7 @@ to Bob with 10 *PerunToken* deposit from both sides via the following command.
 ```
 In Alice's terminal, accept the appearing channel proposal.
 ```
-🔁 Incoming channel proposal from bob with peruntoken funding [My: 10, Peer: 10].
+🔁 Incoming channel proposal from bob with peruntoken funding [My: 10 PRN, Peer: 10 PRN].
 Accept (y/n)? > y
 ```
 The terminal will print the hashes of two transaction: *IncreaseAllowance* and *Deposit*.
@@ -79,7 +79,8 @@ Now you can execute off-chain payments, e.g. in Bob's terminal with
 The updated balance will immediately be printed in both terminals, but no
 transaction will be visible on-chain.
 
-You may always check the current status with command `info`.
+You may always check the current status with command `info` and the asset you 
+want to see the funds for, e.g., `info peruntoken`.
 
 You can also run a performance benchmark with command
 ```

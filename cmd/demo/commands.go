@@ -41,7 +41,7 @@ func init() {
 		}, {
 			"open",
 			[]argument{{"Peer", valAlias}, {"Asset", valAsset}, {"Our Balance", valBal}, {"Their Balance", valBal}},
-			"Open a payment channel with the given peer and balances. The first value is the own balance and the second value is the peers balance. Pass the Asset symbol that you want to use as last argument. It is only possible to open one channel per peer.\nExample: open alice 10 10",
+			"Open a payment channel with the given peer and balances for the provided asset. The first value is the own balance and the second value is the peers balance. Pass the asset that you want to use as the third argument. It is only possible to open one channel per peer.\nExample: open alice peruntoken 10 10",
 			func(args []string) error { return backend.Open(args) },
 		}, {
 			"send",
@@ -61,7 +61,7 @@ func init() {
 		}, {
 			"info",
 			[]argument{{"Asset", valAsset}},
-			"Print information about funds, peers, and channels.",
+			"Print information about peers, channels and funds for a given asset.\nExample: info peruntoken",
 			func(args []string) error { return backend.Info(args) },
 		}, {
 			"benchmark",
