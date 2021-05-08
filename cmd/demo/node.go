@@ -291,7 +291,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 
 	bals := weiToEther(req.InitBals.Balances[0]...)
 	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
-	msg := fmt.Sprintf("🔁 Incoming channel proposal from %[1]v funding [My: %[2]v %[4]s, Peer: %[3]v %[4]s].\nAccept (y/n)? ",
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %[1]v with funding [My: %[2]v %[4]s, Peer: %[3]v %[4]s].\nAccept (y/n)? ",
 		alias, ourBal, theirBal, asset.Type.Symbol())
 	Prompt(msg, func(userInput string) {
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)

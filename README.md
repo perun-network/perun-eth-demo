@@ -67,7 +67,7 @@ to Bob with 10 *PerunToken* deposit from both sides via the following command.
 ```
 In Alice's terminal, accept the appearing channel proposal.
 ```
-🔁 Incoming channel proposal from bob with peruntoken funding [My: 10 PRN, Peer: 10 PRN].
+🔁 Incoming channel proposal from bob with funding [My: 10 PRN, Peer: 10 PRN].
 Accept (y/n)? > y
 ```
 The terminal will print the hashes of two transaction: *IncreaseAllowance* and *Deposit*.
