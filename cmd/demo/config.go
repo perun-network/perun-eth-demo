@@ -76,12 +76,6 @@ type (
 		Assetholder common.Address `mapstructure:"assetholder"`
 	}
 
-	assetConfig struct {
-		Type        assetType      `mapstructure:"type"`
-		Assetholder common.Address `mapstructure:"assetholder"`
-		Address     common.Address `mapstructure:"address"`
-	}
-
 	netConfigEntry struct {
 		PerunID  common.Address
 		Hostname string
