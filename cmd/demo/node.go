@@ -260,7 +260,7 @@ func (n *node) channel(id channel.ID) *paymentChannel {
 	return nil
 }
 
-func (n *node) handleLedgerProposal(prop *client.LedgerChannelProposal, assetName string, res *client.ProposalResponder) {
+func (n *node) handleLedgerProposal(prop *client.LedgerChannelProposal, asset asset, res *client.ProposalResponder) {
 	id := prop.Peers[0]
 	n.log.Debug("Received ledger channel proposal")
 	// Find the peer by its perunID and create it if not present
@@ -295,7 +295,7 @@ func (n *node) handleLedgerProposal(prop *client.LedgerChannelProposal, assetNam
 	})
 }
 
-func (n *node) handleVirtualProposal(prop *client.VirtualChannelProposal, assetName string, res *client.ProposalResponder) {
+func (n *node) handleVirtualProposal(prop *client.VirtualChannelProposal, asset asset, res *client.ProposalResponder) {
 	id := prop.Peers[0]
 	n.log.Debug("Received virtual channel proposal")
 
@@ -307,7 +307,8 @@ func (n *node) handleVirtualProposal(prop *client.VirtualChannelProposal, assetN
 
 	bals := weiToEther(prop.InitBals.Balances[0]...)
 	theirBal, ourBal := bals[0], bals[1] // proposer has index 0, receiver has index 1
-	msg := fmt.Sprintf("🔁 Incoming virtual channel proposal from %v with %s funding [My: %v, Peer: %v].\nWhich hub to do want to accept with (y/n)? ", p.alias, assetName, ourBal, theirBal)
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %[1]v with funding [My: %[2]v %[4]s, Peer: %[3]v %[4]s].\nAccept (y/n)? ",
+		p.alias, ourBal, theirBal, asset.Type.Symbol())
 	Prompt(msg, func(userInput string) {
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 		defer cancel()
@@ -348,7 +349,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	if !ok {
 		log.Fatal("Wrong asset type.")
 	}
-	assetName, found := n.findAsset(common.Address(*_assetAddr))
+	asset, found := n.findAsset(common.Address(*_assetAddr))
 	if !found {
 		reason := fmt.Sprint("unknown asset")
 		n.rejectProposal(res, reason)
@@ -359,9 +360,9 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	defer n.mtx.Unlock()
 	switch prop := prop.(type) {
 	case *client.LedgerChannelProposal:
-		n.handleLedgerProposal(prop, assetName, res)
+		n.handleLedgerProposal(prop, *asset, res)
 	case *client.VirtualChannelProposal:
-		n.handleVirtualProposal(prop, assetName, res)
+		n.handleVirtualProposal(prop, *asset, res)
 	default:
 		log.Fatal("Unknown channel proposal type.")
 	}
@@ -390,7 +391,7 @@ func (n *node) OpenVirtual(args []string) error {
 	peerBalEth, _ := new(big.Float).SetString(args[5])
 
 	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{(*echannel.Asset)(&asset)},
+		Assets:   []channel.Asset{(*echannel.Asset)(&asset.Address)},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
 
