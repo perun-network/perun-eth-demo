@@ -23,13 +23,6 @@ var assetTypeOptions = [...]string{"eth", "erc20"}
 var assetTypeSymbols = [...]string{"Ξ", "PRN"}
 var hubSides = [...]string{"", "active", "passive"}
 
-var contractNameRegistry = map[string]string{
-	"adjudicator_address":      "adjudicator",
-	"assetholderETH_address":   "assetholderETH",
-	"assetholderERC20_address": "assetholderERC20",
-	"peruntoken_address":       "perunToken",
-}
-
 const (
 	contractSetupOptionValidate deploymentOption = iota
 	contractSetupOptionDeploy
