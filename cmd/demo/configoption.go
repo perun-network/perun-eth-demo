@@ -13,7 +13,6 @@ import (
 )
 
 type (
-	assetName        string
 	assetType        int
 	deploymentOption int
 	hubSide          int
@@ -35,11 +34,6 @@ const (
 	contractSetupOptionValidate deploymentOption = iota
 	contractSetupOptionDeploy
 	contractSetupOptionNone
-)
-
-const (
-	assetNameEth   assetName = "eth"
-	assetNameERC20 assetName = "peruntoken"
 )
 
 const (
