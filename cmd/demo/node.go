@@ -351,7 +351,7 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	}
 	asset, found := n.findAsset(common.Address(*_assetAddr))
 	if !found {
-		reason := fmt.Sprint("unknown asset")
+		reason := fmt.Sprintf("unknown asset in proposal: 0x%x", _assetAddr.Bytes())
 		n.rejectProposal(res, reason)
 		return
 	}
@@ -391,7 +391,7 @@ func (n *node) OpenVirtual(args []string) error {
 	peerBalEth, _ := new(big.Float).SetString(args[5])
 
 	initBals := &channel.Allocation{
-		Assets:   []channel.Asset{(*echannel.Asset)(&asset.Address)},
+		Assets:   []channel.Asset{(*echannel.Asset)(&asset.Assetholder)},
 		Balances: [][]*big.Int{etherToWei(myBalEth, peerBalEth)},
 	}
 
@@ -609,6 +609,8 @@ func (n *node) ExistsAsset(asset string) bool {
 func (n *node) findAsset(addr common.Address) (*asset, bool) {
 	for _, asset := range n.assets {
 		if bytes.Equal(asset.Assetholder.Bytes(), addr.Bytes()) {
+			return asset, true
+		} else if bytes.Equal(asset.Alternative.Bytes(), addr.Bytes()) {
 			return asset, true
 		}
 	}

@@ -67,12 +67,7 @@ type (
 	}
 
 	contractConfig struct {
-		Deployment deploymentOption
-
-		contractAddresses `mapstructure:",squash"`
-	}
-
-	contractAddresses struct {
+		Deployment  deploymentOption
 		Adjudicator common.Address
 		Assets      map[string]*asset
 	}
@@ -81,6 +76,7 @@ type (
 		Type        assetType      `mapstructure:"type"`
 		Address     common.Address `mapstructure:"address"`
 		Assetholder common.Address `mapstructure:"assetholder"`
+		Alternative common.Address `mapstructure:"alternative"`
 	}
 
 	netConfigEntry struct {
@@ -110,6 +106,12 @@ func SetConfig() {
 	if err := viper.MergeInConfig(); err != nil {
 		log.Fatalf("Error reading network config file, %s", err)
 	}
+	if len(flags.cfgCtrFile) != 0 {
+		viper.SetConfigFile(flags.cfgCtrFile)
+		if err := viper.MergeInConfig(); err != nil {
+			log.Fatalf("Error reading contracts config file, %s", err)
+		}
+	}
 
 	opts := viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
 		parseEthAddress(),
@@ -118,22 +120,6 @@ func SetConfig() {
 	))
 	if err := viper.Unmarshal(&config, opts); err != nil {
 		log.Fatal(err)
-	}
-
-	// If a contract addresses file is provided, use those addresses instead.
-	if flags.cfgCtrFile != "" {
-		v := viper.New()
-		v.SetConfigFile(flags.cfgCtrFile)
-		if err := v.ReadInConfig(); err != nil {
-			log.Fatalf("Error reading contracts config file, %s", err)
-		}
-
-		var ctrAddresses contractAddresses
-		if err := v.Unmarshal(&ctrAddresses, opts); err != nil {
-			log.Fatal(err)
-		}
-		// Override contract addresses.
-		config.Contracts.contractAddresses = ctrAddresses
 	}
 
 	chain, ok := config.Chains[flags.chain]
@@ -184,6 +170,8 @@ func (c Config) peerAddresses() []common.Address {
 func (c Config) findAsset(addr common.Address) (*asset, bool) {
 	for _, asset := range c.Contracts.Assets {
 		if bytes.Equal(asset.Assetholder.Bytes(), addr.Bytes()) {
+			return asset, true
+		} else if bytes.Equal(asset.Alternative.Bytes(), addr.Bytes()) {
 			return asset, true
 		}
 	}
