@@ -9,12 +9,12 @@ peers:
     hostname: 127.0.0.1
     port: 5751
 
-  ingrid_alice:
+  optimism:
     perunID: 0xF73C1cdA5bD32E6693D3cB313Bd9B9338d96f184
     hostname: 127.0.0.1
     port: 5752
 
-  ingrid_bob:
+  arbitrum:
     perunID: 0xC1b2444C0aAD4DE3f1E76C2F617B593eba75cb5a
     hostname: 127.0.0.1
     port: 5753
@@ -90,24 +90,19 @@ chains:
     GasLimit: 8999999
     GasPrice: 0
 
-contracts:
-  # deploy | validate | none
-  deployment: none
-
-  # The addresses of the contracts can be automatically fetched from the
-  # ../perun-eth-contracts/ folder using the $contract_name syntax.
-
-  # Or $adjudicator_address.
-  adjudicator: $adjudicator_address
-  assets:
-    ETH:
-      type: eth
-      # Or $assetholderETH_address.
-      assetholder: $assetholderETH_address
-
-    PerunToken:
-      type: erc20
-      # Or $peruntoken_address.
-      address: $peruntoken_address
-      # Or $assetholderERC20_address.
-      assetholder: $assetholderERC20_address
+# Uncomment the following if you want to manually configure the addresses.
+# contracts:
+#   # deploy | validate | none
+#   deployment: none
+#   # The addresses of the contracts can be automatically fetched from the
+#   # ../perun-eth-contracts/ folder using the --contracts flag.
+#   adjudicator: 0x0…
+#   assets:
+#     ETH:
+#       type: eth
+#       assetholder: 0x0…
+#     PerunToken:
+#       type: erc20
+#       address: 0x0…
+#       assetholder: 0x0…
+#       alternative: 0x0…
