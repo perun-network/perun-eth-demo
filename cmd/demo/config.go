@@ -19,82 +19,68 @@ import (
 )
 
 // Config contains all configuration read from config.yaml and network.yaml
-type Config struct {
-	Alias        string
-	SecretKey    string
-	Mnemonic     string
-	AccountIndex uint
-	Channel      channelConfig
-	Node         nodeConfig
-	Chain        chainConfig
-	// Read from the network.yaml. The key is the alias.
-	Peers map[string]*netConfigEntry
-}
+type (
+	Config struct {
+		Alias        string
+		SecretKey    string
+		Mnemonic     string
+		AccountIndex uint
+		Channel      channelConfig
+		Node         nodeConfig
+		Chain        chainConfig
+		// Read from the network.yaml. The key is the alias.
+		Peers map[string]*netConfigEntry
+	}
 
-type channelConfig struct {
-	Timeout              time.Duration
-	FundTimeout          time.Duration
-	SettleTimeout        time.Duration
-	ChallengeDurationSec uint64
-}
+	channelConfig struct {
+		Timeout              time.Duration
+		FundTimeout          time.Duration
+		SettleTimeout        time.Duration
+		ChallengeDurationSec uint64
+	}
 
-type nodeConfig struct {
-	IP              string
-	Port            uint16
-	DialTimeout     time.Duration
-	HandleTimeout   time.Duration
-	ReconnecTimeout time.Duration
+	nodeConfig struct {
+		IP              string
+		Port            uint16
+		DialTimeout     time.Duration
+		HandleTimeout   time.Duration
+		ReconnecTimeout time.Duration
 
-	PersistencePath    string
-	PersistenceEnabled bool
-}
+		PersistencePath    string
+		PersistenceEnabled bool
+	}
+	chainConfig struct {
+		TxTimeout     time.Duration       // timeout duration for on-chain transactions
+		ContractSetup string              // contract setup method
+		contractSetup contractSetupOption //
+		Adjudicator   string              // address of adjudicator contract
+		adjudicator   common.Address      //
+		Assetholder   string              // address of asset holder contract
+		assetholder   common.Address      //
+		URL           string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
+		ID            int64               // Chain ID
+	}
 
-type contractSetupOption int
+	netConfigEntry struct {
+		PerunID  string
+		perunID  wire.Address
+		Hostname string
+		Port     uint16
+	}
 
-var contractSetupOptions [3]string = [...]string{"validate", "deploy", "validateordeploy"}
+	contractSetupOption int
+)
+
+var (
+	config               Config
+	contractSetupOptions [3]string = [...]string{"validate", "deploy", "validateordeploy"}
+)
 
 const (
 	contractSetupOptionValidate contractSetupOption = iota
 	contractSetupOptionDeploy
 	contractSetupOptionValidateOrDeploy
 )
-
-func (option contractSetupOption) String() string {
-	return contractSetupOptions[option]
-}
-
-func parseContractSetupOption(s string) (option contractSetupOption, err error) {
-	for i, optionString := range contractSetupOptions {
-		if s == optionString {
-			option = contractSetupOption(i)
-			return
-		}
-	}
-
-	err = errors.New(fmt.Sprintf("Invalid value for config option 'contractsetup'. The value is '%s', but must be one of '%v'.", s, contractSetupOptions))
-	return
-}
-
-type chainConfig struct {
-	TxTimeout     time.Duration       // timeout duration for on-chain transactions
-	ContractSetup string              // contract setup method
-	contractSetup contractSetupOption //
-	Adjudicator   string              // address of adjudicator contract
-	adjudicator   common.Address      //
-	Assetholder   string              // address of asset holder contract
-	assetholder   common.Address      //
-	URL           string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
-	ID            int64               // Chain ID
-}
-
-type netConfigEntry struct {
-	PerunID  string
-	perunID  wire.Address
-	Hostname string
-	Port     uint16
-}
-
-var config Config
 
 // GetConfig returns a pointer to the current `Config`.
 // This is needed to make viper and cobra work together.
@@ -143,6 +129,22 @@ func SetConfig() {
 		}
 		peer.perunID = addr
 	}
+}
+
+func (option contractSetupOption) String() string {
+	return contractSetupOptions[option]
+}
+
+func parseContractSetupOption(s string) (option contractSetupOption, err error) {
+	for i, optionString := range contractSetupOptions {
+		if s == optionString {
+			option = contractSetupOption(i)
+			return
+		}
+	}
+
+	err = errors.New(fmt.Sprintf("Invalid value for config option 'contractsetup'. The value is '%s', but must be one of '%v'.", s, contractSetupOptions))
+	return
 }
 
 func stringToAddress(s string) (common.Address, error) {
