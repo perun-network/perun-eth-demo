@@ -72,7 +72,7 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State) error, desc str
 	state := ch.State()
 	balChanged := stateBefore.Balances[0][0].Cmp(state.Balances[0][0]) != 0
 	if balChanged {
-		bals := weiToEther(state.Allocation.Balances[0]...)
+		bals := plankToEther(state.Allocation.Balances[0]...)
 		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 	}
 	if err == nil {
@@ -107,7 +107,7 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 	}
 
 	if balChanged {
-		bals := weiToEther(update.State.Allocation.Balances[0]...)
+		bals := plankToEther(update.State.Allocation.Balances[0]...)
 		PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	}
 	ch.lastState = update.State.Clone()

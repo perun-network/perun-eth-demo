@@ -1,10 +1,9 @@
 alias: bob
-mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
-accountIndex: 1
+sk: "0x398f0c28f98885e046333d4a41c19cee4c37368a9832c6502f6cfd182e2aef89"
 
 channel:
   timeout: 30s
-  fundtimeout: 30s
+  fundTimeout: 30s
   settleTimeout: 30s
   challengeDurationSec: 60
 
@@ -17,12 +16,11 @@ node:
   persistencePath: /tmp/bob_database
 
 chain:
-  url: ws://127.0.0.1:8545
-  contractsetup: validate
-  adjudicator: 0x079557d7549d7D44F4b00b51d2C532674129ed51
-  assetholder: 0x923439be515b6a928cb9650d70000a9044e49e85
-  txTimeout: 30s
-  ID: 1337
+  nodeUrl: ws://127.0.0.1:9944
+  networkId: 42
+  blockTimeSec: 1
+  blockQueryDepth: 100
+  txTimeoutSec: 30
 
 log:
   level: warn

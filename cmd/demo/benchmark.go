@@ -64,8 +64,8 @@ func (n *node) Benchmark(args []string) error {
 		return errors.New("Open a state channel first")
 	}
 
-	totalAmountWei := etherToWei(big.NewFloat(float64(totalAmountEth)))[0]
-	txAmount := new(big.Int).Div(totalAmountWei, big.NewInt(int64(txCount)))
+	totalAmountPlank := dotToPlank(big.NewFloat(float64(totalAmountEth)))[0]
+	txAmount := new(big.Int).Div(totalAmountPlank, big.NewInt(int64(txCount)))
 	for i := 0; i < txCount; i++ {
 		r.Start()
 		if err := peer.ch.sendMoney(txAmount); err != nil {

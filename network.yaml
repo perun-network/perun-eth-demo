@@ -1,10 +1,10 @@
 peers:
   alice:
-    perunID: 0x2EE1ac154435f542ECEc55C5b0367650d8A5343B
+    perunID: 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d
     hostname: 127.0.0.1
     port: 5750
 
   bob:
-    perunID: 0x70765701b79a4e973dAbb4b30A72f5a845f22F9E
+    perunID: 0x8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48
     hostname: 127.0.0.1
     port: 5751

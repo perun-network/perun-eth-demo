@@ -6,15 +6,12 @@
 package demo
 
 import (
-	"bytes"
-	"encoding/hex"
 	"math/big"
 	"net"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/params"
+	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"github.com/pkg/errors"
-	"perun.network/go-perun/wallet"
 )
 
 func valBal(input string) error {
@@ -68,36 +65,27 @@ func valAlias(arg string) error {
 	return errors.Errorf("Unknown alias, use 'config' to see available")
 }
 
-// strToAddress parses a string as wallet.Address
-func strToAddress(str string) (wallet.Address, error) {
-	if len(str) != 42 {
-		return nil, errors.Errorf("Public keys must be chars 40 hex strings was '%s'", str)
-	}
-	h, err := hex.DecodeString(str[2:])
-	if err != nil {
-		return nil, errors.New("Could not parse address as hexadecimal")
-	}
-	addr, err := wallet.DecodeAddress(bytes.NewBuffer(h))
-	return addr, errors.WithMessage(err, "string to address")
+// strToAddress parses a string as dotwallet.Address
+func strToAddress(str string) (*dotwallet.Address, error) {
+	pk, err := dotwallet.NewPkFromHex(str)
+	return dotwallet.NewAddressFromPk(pk), err
 }
 
-// etherToWei converts amount in "ether" (represented as float) to "wei" (represented as integer).
-// It can provide exact results for values in the range of 1e-18 to 1e9.
-func etherToWei(ethers ...*big.Float) []*big.Int {
-	weis := make([]*big.Int, len(ethers))
+func dotToPlank(ethers ...*big.Float) []*big.Int {
+	planks := make([]*big.Int, len(ethers))
 	for idx, ether := range ethers {
-		weiFloat := new(big.Float).Mul(ether, new(big.Float).SetFloat64(params.Ether))
+		plankFloat := new(big.Float).Mul(ether, new(big.Float).SetFloat64(1e10))
 		// accuracy (second return value) returns "exact" for specified input range, hence ignored.
-		weis[idx], _ = weiFloat.Int(nil)
+		planks[idx], _ = plankFloat.Int(nil)
 	}
-	return weis
+	return planks
 }
 
-// weiToEther converts amount in "wei" (represented as integer) to "ether" (represented as float).
-func weiToEther(weis ...*big.Int) []*big.Float {
-	ethers := make([]*big.Float, len(weis))
-	for idx, wei := range weis {
-		ethers[idx] = new(big.Float).Quo(new(big.Float).SetInt(wei), new(big.Float).SetFloat64(params.Ether))
+// plankToEther converts amount in "plank" (represented as integer) to "ether" (represented as float).
+func plankToEther(planks ...*big.Int) []*big.Float {
+	ethers := make([]*big.Float, len(planks))
+	for idx, plank := range planks {
+		ethers[idx] = new(big.Float).Quo(new(big.Float).SetInt(plank), new(big.Float).SetFloat64(1e10))
 	}
 	return ethers
 }

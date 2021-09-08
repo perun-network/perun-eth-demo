@@ -40,8 +40,8 @@ func init() {
 	demoCmd.PersistentFlags().StringVar(&flags.cfgNetFile, "network", "network.yaml", "Network config file")
 	demoCmd.PersistentFlags().BoolVar(&flags.testAPIEnabled, "test-api", false, "Expose testing API at 8080")
 	demoCmd.PersistentFlags().BoolVar(&GetConfig().Node.PersistenceEnabled, "persistence", false, "Enables the persistence")
-	demoCmd.PersistentFlags().StringVar(&GetConfig().SecretKey, "sk", "", "ETH Secret Key")
-	viper.BindPFlag("secretkey", demoCmd.PersistentFlags().Lookup("sk"))
+	demoCmd.PersistentFlags().StringVar(&GetConfig().Sk, "secretkey", "", "Hex secret key 0x…")
+	viper.BindPFlag("secretkey", demoCmd.PersistentFlags().Lookup("secretkey"))
 	demoCmd.PersistentFlags().BoolVar(&flags.useStdIO, "stdio", false, "Read from stdin")
 }
 

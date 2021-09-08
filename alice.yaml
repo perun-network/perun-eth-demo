@@ -1,6 +1,5 @@
 alias: alice
-mnemonic: pistol kiwi shrug future ozone ostrich match remove crucial oblige cream critic
-accountIndex: 0
+sk: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
 
 channel:
   timeout: 30s
@@ -17,12 +16,11 @@ node:
   persistencePath: /tmp/alice_database
 
 chain:
-  url: ws://127.0.0.1:8545
-  contractsetup: validateordeploy
-  adjudicator: 0x079557d7549d7D44F4b00b51d2C532674129ed51
-  assetholder: 0x923439be515b6a928cb9650d70000a9044e49e85
-  txTimeout: 30s
-  ID: 1337
+  nodeUrl: ws://127.0.0.1:9944
+  networkId: 42
+  blockTimeSec: 1
+  blockQueryDepth: 100
+  txTimeoutSec: 30
 
 log:
   level: warn

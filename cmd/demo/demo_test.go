@@ -11,7 +11,6 @@ import (
 	"io"
 	"math/big"
 	"os/exec"
-	"regexp"
 	"testing"
 	"time"
 
@@ -21,11 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
-
-var (
-	any     = regexp.MustCompile(".+")
-	timeout = time.Second * 30
 )
 
 type Cmd struct {
@@ -137,12 +131,12 @@ func getOnChainBals() ([2]*big.Float, error) {
 	}
 
 	for idx, adr := range [2]string{addressAlice, addressBob} {
-		wei, err := ethereumBackend.BalanceAt(ctx,
+		plank, err := ethereumBackend.BalanceAt(ctx,
 			common.HexToAddress(adr), nil)
 		if err != nil {
 			return bals, err
 		}
-		bals[idx] = new(big.Float).Quo(new(big.Float).SetInt(wei),
+		bals[idx] = new(big.Float).Quo(new(big.Float).SetInt(plank),
 			new(big.Float).SetFloat64(params.Ether))
 	}
 
