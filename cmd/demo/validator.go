@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/perun-network/perun-polkadot-backend/client"
 	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"github.com/pkg/errors"
 )
@@ -74,18 +75,9 @@ func strToAddress(str string) (*dotwallet.Address, error) {
 func dotToPlank(ethers ...*big.Float) []*big.Int {
 	planks := make([]*big.Int, len(ethers))
 	for idx, ether := range ethers {
-		plankFloat := new(big.Float).Mul(ether, new(big.Float).SetFloat64(1e10))
+		plankFloat := new(big.Float).Mul(ether, new(big.Float).SetFloat64(client.PlankPerDot))
 		// accuracy (second return value) returns "exact" for specified input range, hence ignored.
 		planks[idx], _ = plankFloat.Int(nil)
 	}
 	return planks
-}
-
-// plankToEther converts amount in "plank" (represented as integer) to "ether" (represented as float).
-func plankToEther(planks ...*big.Int) []*big.Float {
-	ethers := make([]*big.Float, len(planks))
-	for idx, plank := range planks {
-		ethers[idx] = new(big.Float).Quo(new(big.Float).SetInt(plank), new(big.Float).SetFloat64(1e10))
-	}
-	return ethers
 }

@@ -27,7 +27,7 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 // indirect
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
-	perun.network/go-perun v0.7.0
+	perun.network/go-perun v0.7.1-0.20210906093156-b11e1a5fd934
 )
 
 replace github.com/perun-network/perun-polkadot-backend => ../perun-polkadot-backend

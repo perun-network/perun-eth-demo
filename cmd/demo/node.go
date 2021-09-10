@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 
 	dotchannel "github.com/perun-network/perun-polkadot-backend/channel"
+	dotclient "github.com/perun-network/perun-polkadot-backend/client"
 	dotsubstrate "github.com/perun-network/perun-polkadot-backend/pkg/substrate"
 	dotwallet "github.com/perun-network/perun-polkadot-backend/wallet/sr25519"
 	"perun.network/go-perun/channel"
@@ -66,7 +67,7 @@ func (n *node) getOnChainBal(ctx context.Context, addrs ...wallet.Address) ([]*b
 		if err != nil {
 			return nil, errors.Wrap(err, "querying on-chain balance")
 		}
-		bals[i] = accInfo.Data.Free.Int
+		bals[i] = accInfo.Free.Int
 	}
 	return bals, nil
 }
@@ -141,8 +142,8 @@ func (n *node) setupChannel(ch *client.Channel) {
 		l.WithError(err).Debug("Watcher stopped")
 	}()
 
-	bals := plankToEther(ch.State().Balances[0]...)
-	fmt.Printf("🆕 Channel established with %s. Initial balance: [My: %v Ξ, Peer: %v Ξ]\n",
+	bals := dotclient.NewDotsFromPlanks(ch.State().Balances[0]...)
+	fmt.Printf("🆕 Channel established with %s. Initial balance: [My: %v, Peer: %v]\n",
 		p.alias, bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 }
 
@@ -255,10 +256,10 @@ func (n *node) HandleProposal(prop client.ChannelProposal, res *client.ProposalR
 	}
 	n.log.WithField("peer", id).Debug("Channel proposal")
 
-	bals := plankToEther(req.InitBals.Balances[0]...)
+	bals := dotclient.NewDotsFromPlanks(req.InitBals.Balances[0]...)
 	theirBal := bals[0] // proposer has index 0
 	ourBal := bals[1]   // proposal receiver has index 1
-	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with funding [My: %v Ξ, Peer: %v Ξ].\nAccept (y/n)? ", alias, ourBal, theirBal)
+	msg := fmt.Sprintf("🔁 Incoming channel proposal from %v with funding [My: %v, Peer: %v].\nAccept (y/n)? ", alias, ourBal, theirBal)
 	Prompt(msg, func(userInput string) {
 		ctx, cancel := context.WithTimeout(context.Background(), config.Node.HandleTimeout)
 		defer cancel()
@@ -367,10 +368,7 @@ func (n *node) settle(p *peer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
 
-	if err := p.ch.Register(ctx); err != nil {
-		return errors.WithMessage(err, "registering")
-	}
-	if err := p.ch.Settle(ctx, p.ch.Idx() == 0); err != nil {
+	if err := p.ch.Settle(ctx, false); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}
 
@@ -397,13 +395,13 @@ func (n *node) Info(args []string) error {
 		if err != nil {
 			return err
 		}
-		onChainBalsEth := plankToEther(onChainBals...)
+		onChainBalsEth := dotclient.NewDotsFromPlanks(onChainBals...)
 		if peer.ch == nil {
-			fmt.Fprintf(w, "%s\t%s\t \t \t \t%v\t%v\t\n", alias, "Connected", onChainBalsEth[0].Text('e', 3), onChainBalsEth[1].Text('e', 3))
+			fmt.Fprintf(w, "%s\t%s\t \t \t \t%v\t%v\t\n", alias, "Connected", onChainBalsEth[0], onChainBalsEth[1])
 		} else {
-			bals := plankToEther(peer.ch.GetBalances())
+			bals := dotclient.NewDotsFromPlanks(peer.ch.GetBalances())
 			fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%v\t%v\t%v\t\n",
-				alias, peer.ch.Phase(), peer.ch.State().Version, bals[0], bals[1], onChainBalsEth[0].Text('e', 3), onChainBalsEth[1].Text('e', 3))
+				alias, peer.ch.Phase(), peer.ch.State().Version, bals[0], bals[1], onChainBalsEth[0], onChainBalsEth[1])
 		}
 	}
 	fmt.Fprintln(w)

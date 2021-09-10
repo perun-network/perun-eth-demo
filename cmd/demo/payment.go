@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 
+	dotclient "github.com/perun-network/perun-polkadot-backend/client"
 	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -72,8 +73,8 @@ func (ch *paymentChannel) sendUpdate(update func(*channel.State) error, desc str
 	state := ch.State()
 	balChanged := stateBefore.Balances[0][0].Cmp(state.Balances[0][0]) != 0
 	if balChanged {
-		bals := plankToEther(state.Allocation.Balances[0]...)
-		fmt.Printf("💰 Sent payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
+		bals := dotclient.NewDotsFromPlanks(state.Allocation.Balances[0]...)
+		fmt.Printf("💰 Sent payment. New balance: [My: %v, Peer: %v]\n", bals[ch.Idx()], bals[1-ch.Idx()]) // assumes two-party channel
 	}
 	if err == nil {
 		ch.lastState = state
@@ -107,8 +108,8 @@ func (ch *paymentChannel) Handle(update client.ChannelUpdate, res *client.Update
 	}
 
 	if balChanged {
-		bals := plankToEther(update.State.Allocation.Balances[0]...)
-		PrintfAsync("💰 Received payment. New balance: [My: %v Ξ, Peer: %v Ξ]\n", bals[ch.Idx()], bals[1-ch.Idx()])
+		bals := dotclient.NewDotsFromPlanks(update.State.Allocation.Balances[0]...)
+		PrintfAsync("💰 Received payment. New balance: [My: %v, Peer: %v]\n", bals[ch.Idx()], bals[1-ch.Idx()])
 	}
 	ch.lastState = update.State.Clone()
 }

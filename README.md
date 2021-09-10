@@ -64,7 +64,7 @@ to Bob with 100 ETH deposit from both sides via the following command.
 ```
 In Alice's terminal, accept the appearing channel proposal.
 ```
-🔁 Incoming channel proposal from alice with funding [My: 100 Ξ, Peer: 100 Ξ].
+🔁 Incoming channel proposal from alice with funding [My: 100 Plank, Peer: 100 Plank].
 Accept (y/n)? > y
 ```
 In the ganache terminal, you can see two new transactions, which correspond to
