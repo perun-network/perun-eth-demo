@@ -159,9 +159,9 @@ func (n *node) setupContracts() error {
 	n.asset = (*ewallet.Address)(&n.assetAddr)
 	n.log.WithField("Adj", n.adjAddr).WithField("Asset", n.assetAddr).Debug("Set contracts")
 
-	accounts := map[echannel.Asset]accounts.Account{ewallet.Address(n.assetAddr): n.onChain.Account}
-	depositors := map[echannel.Asset]echannel.Depositor{ewallet.Address(n.assetAddr): new(echannel.ETHDepositor)}
-	n.funder = echannel.NewFunder(n.cb, accounts, depositors)
+	funder := echannel.NewFunder(n.cb)
+	funder.RegisterAsset(ewallet.Address(n.assetAddr), new(echannel.ETHDepositor), n.onChain.Account)
+	n.funder = funder
 
 	return nil
 }

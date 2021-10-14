@@ -5,6 +5,6 @@ peers:
     port: 5750
 
   bob:
-    perunID: 0x70765701b79a4e973dAbb4b30A72f5a845f22F9E
+    perunID: 0xF73C1cdA5bD32E6693D3cB313Bd9B9338d96f184
     hostname: 127.0.0.1
     port: 5751
