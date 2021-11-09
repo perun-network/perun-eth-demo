@@ -27,6 +27,7 @@ import (
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/log"
 	"perun.network/go-perun/pkg/sortedkv/leveldb"
+	"perun.network/go-perun/watcher/local"
 	wirenet "perun.network/go-perun/wire/net"
 	"perun.network/go-perun/wire/net/simple"
 )
@@ -63,7 +64,7 @@ func newNode() (*node, error) {
 		onChain: acc,
 		wallet:  wallet,
 		dialer:  dialer,
-		cb:      echannel.NewContractBackend(ethereumBackend, phd.NewTransactor(wallet.Wallet(), signer)),
+		cb:      echannel.NewContractBackend(ethereumBackend, phd.NewTransactor(wallet.Wallet(), signer), config.Chain.TxFinalityDepth),
 		peers:   make(map[string]*peer),
 	}
 	return n, n.setup()
@@ -92,7 +93,11 @@ func (n *node) setup() error {
 
 	n.bus = wirenet.NewBus(n.onChain, n.dialer)
 
-	if n.client, err = client.New(n.onChain.Address(), n.bus, n.funder, n.adjudicator, n.wallet); err != nil {
+	watcher, err := local.NewWatcher(n.adjudicator)
+	if err != nil {
+		return errors.WithMessage(err, "creating watcher")
+	}
+	if n.client, err = client.New(n.onChain.Address(), n.bus, n.funder, n.adjudicator, n.wallet, watcher); err != nil {
 		return errors.WithMessage(err, "creating client")
 	}
 

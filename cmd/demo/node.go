@@ -372,9 +372,6 @@ func (n *node) settle(p *peer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
 
-	if err := p.ch.Register(ctx); err != nil {
-		return errors.WithMessage(err, "registering")
-	}
 	if err := p.ch.Settle(ctx, p.ch.Idx() == 0); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}
