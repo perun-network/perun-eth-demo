@@ -199,7 +199,7 @@ func findConfig(id wallet.Address) (string, *netConfigEntry) {
 	return "", nil
 }
 
-func (n *node) HandleUpdate(update client.ChannelUpdate, resp *client.UpdateResponder) {
+func (n *node) HandleUpdate(_ *channel.State, update client.ChannelUpdate, resp *client.UpdateResponder) {
 	n.mtx.Lock()
 	defer n.mtx.Unlock()
 	log := n.log.WithField("channel", update.State.ID)
@@ -372,9 +372,6 @@ func (n *node) settle(p *peer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Channel.SettleTimeout)
 	defer cancel()
 
-	if err := p.ch.Register(ctx); err != nil {
-		return errors.WithMessage(err, "registering")
-	}
 	if err := p.ch.Settle(ctx, p.ch.Idx() == 0); err != nil {
 		return errors.WithMessage(err, "settling the channel")
 	}

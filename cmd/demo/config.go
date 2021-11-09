@@ -76,15 +76,16 @@ func parseContractSetupOption(s string) (option contractSetupOption, err error) 
 }
 
 type chainConfig struct {
-	TxTimeout     time.Duration       // timeout duration for on-chain transactions
-	ContractSetup string              // contract setup method
-	contractSetup contractSetupOption //
-	Adjudicator   string              // address of adjudicator contract
-	adjudicator   common.Address      //
-	Assetholder   string              // address of asset holder contract
-	assetholder   common.Address      //
-	URL           string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
-	ID            int64               // Chain ID
+	TxTimeout       time.Duration // timeout duration for on-chain transactions
+	TxFinalityDepth uint64
+	ContractSetup   string              // contract setup method
+	contractSetup   contractSetupOption //
+	Adjudicator     string              // address of adjudicator contract
+	adjudicator     common.Address      //
+	Assetholder     string              // address of asset holder contract
+	assetholder     common.Address      //
+	URL             string              // URL the endpoint of your ethereum node / infura eg: ws://10.70.5.70:8546
+	ID              int64               // Chain ID
 }
 
 type netConfigEntry struct {
