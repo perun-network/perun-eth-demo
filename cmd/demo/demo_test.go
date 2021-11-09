@@ -11,7 +11,6 @@ import (
 	"io"
 	"math/big"
 	"os/exec"
-	"regexp"
 	"testing"
 	"time"
 
@@ -21,11 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
-
-var (
-	any     = regexp.MustCompile(".+")
-	timeout = time.Second * 30
 )
 
 type Cmd struct {
@@ -52,7 +46,7 @@ func nodeCmd(name string) (*Cmd, error) {
 }
 
 const (
-	blockTime       = 5 * time.Second
+	blockTime       = 1 * time.Second
 	txFinalityDepth = 3
 	numUpdates      = 25
 	ethUrl          = "ws://127.0.0.1:8545"
