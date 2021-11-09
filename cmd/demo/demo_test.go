@@ -52,11 +52,12 @@ func nodeCmd(name string) (*Cmd, error) {
 }
 
 const (
-	blockTime    = 5 * time.Second
-	numUpdates   = 25
-	ethUrl       = "ws://127.0.0.1:8545"
-	addressAlice = "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B"
-	addressBob   = "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E"
+	blockTime       = 5 * time.Second
+	txFinalityDepth = 3
+	numUpdates      = 25
+	ethUrl          = "ws://127.0.0.1:8545"
+	addressAlice    = "0x2EE1ac154435f542ECEc55C5b0367650d8A5343B"
+	addressBob      = "0x70765701b79a4e973dAbb4b30A72f5a845f22F9E"
 )
 
 func TestNodes(t *testing.T) {
@@ -65,7 +66,7 @@ func TestNodes(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, alice.Start())
 	defer alice.Process.Kill()
-	time.Sleep(blockTime * 2) // Wait 2 blocks for contract deployment.
+	time.Sleep(blockTime*2 + txFinalityDepth*blockTime) // Wait 2 blocks for contract deployment.
 
 	// Start Bob.
 	bob, err := nodeCmd("bob")
@@ -84,7 +85,7 @@ func TestNodes(t *testing.T) {
 	time.Sleep(3 * time.Second) // Ensure that Bob really received the proposal.
 	require.NoError(t, bob.sendCommand("y\n"), "accepting channel proposal")
 	t.Log("Opening channel…")
-	time.Sleep(blockTime) // Wait 1 block for funding transactions to be confirmed.
+	time.Sleep(blockTime + txFinalityDepth*blockTime) // Wait 1 block for funding transactions to be confirmed.
 
 	// Alice sends to Bob and Bob to Alice.
 	for i := 0; i < numUpdates; i++ {
@@ -99,7 +100,7 @@ func TestNodes(t *testing.T) {
 	t.Log("Closing channel…")
 	require.NoError(t, alice.sendCommand("close bob\n"))
 	// Wait 2 blocks for the settle and withdrawal transactions plus some additional seconds.
-	time.Sleep(2*blockTime + 5*time.Second)
+	time.Sleep(2*blockTime + 5*time.Second + txFinalityDepth*blockTime)
 
 	// Get the final balances from Alice and Bob after the settlement.
 	finalBals, err := getOnChainBals()
